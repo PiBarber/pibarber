@@ -4,6 +4,8 @@ import { randomBytes } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
+import { VERSAO_PRIVACIDADE, VERSAO_TERMOS } from "../src/lib/termos";
+
 import {
   ANON_KEY,
   ASAAS_WEBHOOK_TOKEN,
@@ -86,8 +88,15 @@ function psql(opcoes: string[], entrada: string): string {
 
 export type Conta = { id: string; email: string; nome: string; telefone: string };
 
-/** Conta de cliente confirmada, com nome e celular (o que o agendar exige). */
-export async function criarCliente(nome = "Cliente E2E"): Promise<Conta> {
+/**
+ * Conta de cliente confirmada, com nome e celular (o que o agendar exige) e
+ * com o aceite dos termos em dia — senão o middleware a para em
+ * /aceitar-termos. `semAceite` é a conta que nasceu pelo Google.
+ */
+export async function criarCliente(
+  nome = "Cliente E2E",
+  opcoes: { semAceite?: boolean } = {},
+): Promise<Conta> {
   const email = `${unico("cliente")}@example.com`;
   const telefone = celularUnico();
   const { data, error } = await admin.auth.admin.createUser({
@@ -100,7 +109,18 @@ export async function criarCliente(nome = "Cliente E2E"): Promise<Conta> {
   executar(
     `update profiles set phone = '${telefone}', full_name = '${nome}' where id = '${data.user.id}'`,
   );
+  if (!opcoes.semAceite) registrarAceite(data.user.id);
   return { id: data.user.id, email, nome, telefone };
+}
+
+/** O aceite, como a tela de cadastro gravaria. Por padrão, das versões de hoje. */
+export function registrarAceite(
+  userId: string,
+  versoes = { termos: VERSAO_TERMOS, privacidade: VERSAO_PRIVACIDADE },
+): void {
+  executar(`
+    insert into terms_acceptances (user_id, terms_version, privacy_version, source)
+    values ('${userId}', '${versoes.termos}', '${versoes.privacidade}', 'cadastro_cliente')`);
 }
 
 export type Loja = {

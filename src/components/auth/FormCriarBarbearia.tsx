@@ -6,9 +6,11 @@ import { useRef, useState, useTransition } from "react";
 
 import { criarContaBarbearia, vincularBarbearia } from "@/app/actions/auth";
 import { BotaoGoogle } from "@/components/auth/BotaoGoogle";
+import { CaixaTermos } from "@/components/auth/CaixaTermos";
 import { Button, Field, Input } from "@/components/ui";
 import { erroDeTelefone } from "@/lib/telefone";
-import { cn, mascaraTelefone } from "@/lib/utils";
+import { MENSAGEM_TERMOS } from "@/lib/termos";
+import { mascaraTelefone } from "@/lib/utils";
 
 /**
  * CRIAR CONTA DE BARBEARIA — o dono cria a conta e a loja de uma vez.
@@ -124,7 +126,7 @@ export function FormCriarBarbearia() {
       return;
     }
     if (!termos) {
-      mostrarErro("termos", "Aceite os termos de uso e a política de privacidade para continuar.");
+      mostrarErro("termos", MENSAGEM_TERMOS);
       return;
     }
 
@@ -134,7 +136,13 @@ export function FormCriarBarbearia() {
 
     iniciar(async () => {
       const resultado = vinculo
-        ? await vincularBarbearia({ email, senha: senhaVinculo, nomeBarbearia, telefone })
+        ? await vincularBarbearia({
+            email,
+            senha: senhaVinculo,
+            nomeBarbearia,
+            telefone,
+            aceitouTermos: termos,
+          })
         : await criarContaBarbearia({
             nome,
             nomeBarbearia,
@@ -142,6 +150,7 @@ export function FormCriarBarbearia() {
             telefone,
             senha,
             confirmacao,
+            aceitouTermos: termos,
           });
 
       emVoo.current = false;
@@ -390,48 +399,15 @@ export function FormCriarBarbearia() {
           </>
         ) : null}
 
-        <div className="flex flex-col gap-1.5">
-          <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-ink-soft">
-            <input
-              id="termos"
-              ref={refs.termos}
-              type="checkbox"
-              checked={termos}
-              onChange={(e) => {
-                setTermos(e.target.checked);
-                limpar("termos");
-              }}
-              aria-invalid={Boolean(erros.termos)}
-              className={cn(
-                "mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded-md accent-brass",
-                erros.termos && "outline outline-2 outline-danger",
-              )}
-            />
-            <span>
-              Li e aceito os{" "}
-              <Link
-                href="/termos"
-                target="_blank"
-                className="font-semibold text-brass hover:text-brass-deep"
-              >
-                termos de uso
-              </Link>{" "}
-              e a{" "}
-              <Link
-                href="/privacidade"
-                target="_blank"
-                className="font-semibold text-brass hover:text-brass-deep"
-              >
-                política de privacidade
-              </Link>
-            </span>
-          </label>
-          {erros.termos ? (
-            <p className="text-xs text-danger" role="alert">
-              {erros.termos}
-            </p>
-          ) : null}
-        </div>
+        <CaixaTermos
+          marcada={termos}
+          aoMudar={(marcada) => {
+            setTermos(marcada);
+            limpar("termos");
+          }}
+          erro={erros.termos}
+          inputRef={refs.termos}
+        />
 
         <Button type="submit" tamanho="lg" larguraTotal carregando={enviando}>
           {vinculo ? "Entrar e vincular minha barbearia" : "Criar minha barbearia"}

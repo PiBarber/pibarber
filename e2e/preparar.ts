@@ -2,6 +2,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { VERSAO_PRIVACIDADE, VERSAO_TERMOS } from "../src/lib/termos";
 import { CONTAINER_DB } from "./ambiente";
 
 /**
@@ -45,4 +46,16 @@ export default function preparar() {
       throw new Error(`Migração ${arquivo} falhou no banco local:\n${saida}`);
     }
   }
+
+  // As contas do seed já aceitaram os termos de hoje — senão todo teste que
+  // entra com elas pararia em /aceitar-termos (supabase/37_aceite_dos_termos.sql).
+  execFileSync(
+    "docker",
+    ["exec", "-i", CONTAINER_DB, "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres"],
+    {
+      input: `insert into terms_acceptances (user_id, terms_version, privacy_version, source)
+              select id, '${VERSAO_TERMOS}', '${VERSAO_PRIVACIDADE}', 'cadastro_cliente' from profiles;`,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
 }

@@ -1239,7 +1239,9 @@ export type Database = {
           id: string
           is_platform_admin: boolean
           phone: string | null
+          privacy_version: string | null
           role: Database["public"]["Enums"]["user_role"]
+          terms_version: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1252,7 +1254,9 @@ export type Database = {
           id: string
           is_platform_admin?: boolean
           phone?: string | null
+          privacy_version?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          terms_version?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1265,7 +1269,9 @@ export type Database = {
           id?: string
           is_platform_admin?: boolean
           phone?: string | null
+          privacy_version?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          terms_version?: string | null
         }
         Relationships: [
           {
@@ -1664,6 +1670,41 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terms_acceptances: {
+        Row: {
+          accepted_at: string
+          id: string
+          privacy_version: string
+          source: string
+          terms_version: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          id?: string
+          privacy_version: string
+          source: string
+          terms_version: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          id?: string
+          privacy_version?: string
+          source?: string
+          terms_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terms_acceptances_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

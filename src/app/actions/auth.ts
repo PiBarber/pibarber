@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 
+import { registrarAceite } from "@/lib/aceite-termos";
 import { ROTA_EMAIL_CONFIRMADO, ROTA_REDEFINIR_SENHA } from "@/lib/auth";
 import {
   casaDoLado,
@@ -20,6 +21,7 @@ import { criarBarbeariaDoDono, telefoneDeOutroDono } from "@/lib/nova-barbearia"
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { erroDeTelefone, normalizarTelefone } from "@/lib/telefone";
+import { aceiteEmDia, MENSAGEM_TERMOS, ROTA_ACEITAR_TERMOS } from "@/lib/termos";
 import { falha, sucesso, type ActionResult } from "@/lib/types";
 
 /**
@@ -86,6 +88,22 @@ function destinoSeguro(proximo: FormDataEntryValue | string | null | undefined):
   return valor;
 }
 
+/**
+ * O destino depois de entrar, passando antes por /aceitar-termos se o aceite
+ * não estiver em dia.
+ *
+ * Precisa ser aqui, e não só no middleware: o `redirect()` de uma server
+ * action para uma página do próprio app é renderizado na mesma resposta, sem
+ * passar pelo middleware.
+ */
+function comAceite(
+  perfil: { terms_version: string | null; privacy_version: string | null },
+  destino: string,
+): string {
+  if (aceiteEmDia(perfil)) return destino;
+  return `${ROTA_ACEITAR_TERMOS}?proximo=${encodeURIComponent(destino)}`;
+}
+
 /* ==========================================================================
    Entrar
    ==========================================================================
@@ -132,7 +150,7 @@ export async function entrar(entrada: {
     // Onde cada papel mora. Lido aqui porque a sessão acabou de nascer.
     const { data: perfil, error: erroPerfil } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, terms_version, privacy_version")
       .eq("id", data.user.id)
       .maybeSingle();
 
@@ -147,7 +165,11 @@ export async function entrar(entrada: {
     (await cookies()).set(COOKIE_LADO, lado, OPCOES_COOKIE_LADO);
 
     revalidatePath("/", "layout");
-    redirect(proximo ?? casaDoLado(porta, temBarbearia));
+    // Perfil ilegível (banco fora, ou sem a migração 37) não para ninguém
+    // aqui — o mesmo que o middleware faz. Parar mandaria a pessoa a uma tela
+    // de aceite que também não conseguiria gravar.
+    const destino = proximo ?? casaDoLado(porta, temBarbearia);
+    redirect(erroPerfil || !perfil ? destino : comAceite(perfil, destino));
   } catch (error) {
     unstable_rethrow(error); // deixa o redirect() acima passar
     console.error("[auth] erro inesperado em entrar:", error);
@@ -241,6 +263,8 @@ export async function criarConta(entrada: {
   telefone: string;
   senha: string;
   confirmacao: string;
+  /** A caixa "Li e aceito". Conferida aqui: a tela sozinha não prova nada. */
+  aceitouTermos: boolean;
 }): Promise<ActionResult> {
   const nome = entrada.nome.trim();
   const email = entrada.email.trim().toLowerCase();
@@ -261,6 +285,7 @@ export async function criarConta(entrada: {
   if (!senha) return falha("Crie uma senha.", "senha");
   if (senha.length < 6) return falha("A senha precisa ter pelo menos 6 caracteres.", "senha");
   if (senha !== confirmacao) return falha("As senhas não são iguais.", "confirmacao");
+  if (entrada.aceitouTermos !== true) return falha(MENSAGEM_TERMOS, "termos");
 
   try {
     const supabase = await createClient();
@@ -308,6 +333,8 @@ export async function criarConta(entrada: {
       // telefone de quem está sem ele (AvisoTelefone e o agendamento).
       if (erroTelefone)
         console.error("[auth] falha ao gravar o telefone do cliente:", erroTelefone);
+
+      await registrarAceite(data.user.id, "cadastro_cliente");
     }
 
     // Sem sessão = o projeto exige confirmação por e-mail.
@@ -358,6 +385,7 @@ export async function criarContaBarbearia(entrada: {
   telefone: string;
   senha: string;
   confirmacao: string;
+  aceitouTermos: boolean;
 }): Promise<ActionResult> {
   const nome = entrada.nome.trim();
   const nomeBarbearia = entrada.nomeBarbearia.trim();
@@ -374,6 +402,7 @@ export async function criarContaBarbearia(entrada: {
   if (!senha) return falha("Crie uma senha.", "senha");
   if (senha.length < 6) return falha("A senha precisa ter pelo menos 6 caracteres.", "senha");
   if (senha !== entrada.confirmacao) return falha("As senhas não são iguais.", "confirmacao");
+  if (entrada.aceitouTermos !== true) return falha(MENSAGEM_TERMOS, "termos");
 
   try {
     const admin = createAdminClient();
@@ -426,6 +455,9 @@ export async function criarContaBarbearia(entrada: {
         : falha("Não consegui criar a barbearia. Tente de novo em instantes.");
     }
 
+    // Depois da loja: se ela falhasse, a conta seria apagada e o aceite junto.
+    await registrarAceite(userId, "cadastro_barbearia");
+
     if (!data.session) {
       return sucesso(
         undefined,
@@ -477,6 +509,7 @@ export async function vincularBarbearia(entrada: {
   senha: string;
   nomeBarbearia: string;
   telefone: string;
+  aceitouTermos: boolean;
 }): Promise<ActionResult> {
   const email = entrada.email.trim().toLowerCase();
   const nomeBarbearia = entrada.nomeBarbearia.trim();
@@ -487,6 +520,7 @@ export async function vincularBarbearia(entrada: {
   if (nomeBarbearia.length < 2) return falha("Escreva o nome da barbearia.", "nomeBarbearia");
   const erroTelefone = erroDeTelefone(telefone);
   if (erroTelefone) return falha(erroTelefone, "telefone");
+  if (entrada.aceitouTermos !== true) return falha(MENSAGEM_TERMOS, "termos");
 
   try {
     const supabase = await createClient();
@@ -518,6 +552,10 @@ export async function vincularBarbearia(entrada: {
       console.error("[auth] falha ao ler o perfil no vínculo:", erroPerfil);
       return falha("Não consegui vincular a barbearia. Tente de novo em instantes.");
     }
+
+    // A senha provou a conta, e a caixa estava marcada: o aceite vale mesmo
+    // que a conta já tenha barbearia e só entre por aqui.
+    await registrarAceite(data.user.id, "vinculo_barbearia");
 
     const cookieStore = await cookies();
 
@@ -566,6 +604,53 @@ export async function vincularBarbearia(entrada: {
     unstable_rethrow(error);
     console.error("[auth] erro inesperado em vincularBarbearia:", error);
     return falha("Não consegui vincular a barbearia. Tente de novo em instantes.");
+  }
+}
+
+/* ==========================================================================
+   Aceitar os termos — /aceitar-termos
+   ========================================================================== */
+
+/**
+ * Quem chegou ao app sem um aceite em dia: a conta criada pelo Google (que não
+ * passa por caixa nenhuma), o assistente criado pelo dono, a conta de antes do
+ * registro existir, e todo mundo quando a versão dos termos muda. O middleware
+ * manda para /aceitar-termos; esta action grava e devolve ao destino.
+ */
+export async function aceitarTermos(entrada: {
+  aceitouTermos: boolean;
+  proximo?: string;
+}): Promise<ActionResult> {
+  if (entrada.aceitouTermos !== true) return falha(MENSAGEM_TERMOS, "termos");
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return falha("Sua sessão expirou. Entre de novo.");
+
+    // A sessão é dele: getUser() validou o token no servidor do Supabase.
+    const gravado = await registrarAceite(user.id, "tela_de_aceite");
+    if (!gravado) return falha("Não consegui registrar o aceite. Tente de novo em instantes.");
+
+    const { data: perfil } = await supabase
+      .from("profiles")
+      .select("role, is_platform_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+    const temBarbearia = perfil?.role === "owner" || perfil?.role === "assistant";
+    const lado = ladoDaSessao((await cookies()).get(COOKIE_LADO)?.value, {
+      temBarbearia,
+      ehAdmin: perfil?.is_platform_admin ?? false,
+    });
+
+    revalidatePath("/", "layout");
+    redirect(destinoSeguro(entrada.proximo) ?? casaDoLado(lado, temBarbearia));
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[auth] erro inesperado em aceitarTermos:", error);
+    return falha("Não consegui registrar o aceite. Tente de novo em instantes.");
   }
 }
 
@@ -693,9 +778,9 @@ export async function redefinirSenha(entrada: {
       return falha(texto, campo);
     }
 
-    const { data: perfil } = await supabase
+    const { data: perfil, error: erroPerfil } = await supabase
       .from("profiles")
-      .select("role, is_platform_admin")
+      .select("role, is_platform_admin, terms_version, privacy_version")
       .eq("id", user.id)
       .maybeSingle();
     const temBarbearia = perfil?.role === "owner" || perfil?.role === "assistant";
@@ -705,7 +790,9 @@ export async function redefinirSenha(entrada: {
     });
 
     revalidatePath("/", "layout");
-    redirect(casaDoLado(lado, temBarbearia));
+    const casa = casaDoLado(lado, temBarbearia);
+    // Sem o perfil, não para (ver `entrar`); o admin não passa pelo aceite.
+    redirect(lado === "admin" || erroPerfil || !perfil ? casa : comAceite(perfil, casa));
   } catch (error) {
     unstable_rethrow(error);
     console.error("[auth] erro inesperado em redefinirSenha:", error);

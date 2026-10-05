@@ -12,6 +12,7 @@ import {
   ROTA_ENTRAR_BARBEIRO,
   ROTA_ENTRAR_CLIENTE,
 } from "@/lib/lado";
+import { aceiteEmDia, ROTA_ACEITAR_TERMOS } from "@/lib/termos";
 import { COOKIE_VISUALIZACAO, lojaDoCookie } from "@/lib/visualizacao";
 
 /**
@@ -117,7 +118,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: perfil, error } = await supabase
     .from("profiles")
-    .select("role, is_platform_admin")
+    .select("role, is_platform_admin, terms_version, privacy_version")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -179,6 +180,17 @@ export async function middleware(request: NextRequest) {
     const destino = request.nextUrl.clone();
     destino.pathname = casa;
     destino.search = "";
+    return NextResponse.redirect(destino);
+  }
+
+  // --- O aceite dos termos em dia (src/lib/termos.ts) ----------------------
+  // Só no app e no painel. O /admin é a equipe da plataforma, e o "ver como o
+  // dono" é o admin olhando, não o dono aceitando.
+  if (!emAdmin && !visualizando && !aceiteEmDia(perfil)) {
+    const destino = request.nextUrl.clone();
+    destino.pathname = ROTA_ACEITAR_TERMOS;
+    destino.search = "";
+    destino.searchParams.set("proximo", `${caminho}${request.nextUrl.search}`);
     return NextResponse.redirect(destino);
   }
 
