@@ -32,7 +32,7 @@ export default function CriarContaClientePage() {
 
       <DivisorOu />
 
-      <BotaoGoogle rotulo="Criar conta com o Google" lado="cliente" />
+      <BotaoGoogle rotulo="Criar conta com o Google" />
 
       <p className="mt-7 text-center text-sm text-ink-soft">
         Já tem conta?{" "}

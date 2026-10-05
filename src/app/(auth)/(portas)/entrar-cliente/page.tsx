@@ -34,12 +34,12 @@ export default async function EntrarClientePage({
       <p className="mt-1.5 text-sm text-ink-soft">Para agendar e acompanhar seus horários.</p>
 
       <div className="mt-7">
-        <FormEntrar proximo={proximo} erroInicial={erro} lado="cliente" />
+        <FormEntrar proximo={proximo} erroInicial={erro} />
       </div>
 
       <DivisorOu />
 
-      <BotaoGoogle proximo={proximo} lado="cliente" />
+      <BotaoGoogle proximo={proximo} />
 
       <p className="mt-7 text-center text-sm text-ink-soft">
         Ainda não tem conta?{" "}

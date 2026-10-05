@@ -45,20 +45,21 @@ function Interno({ rotulo }: { rotulo: string }) {
   );
 }
 
+/**
+ * Só no lado do CLIENTE. O painel da barbearia e o /admin abrem apenas com
+ * e-mail e senha (decisão do produto) — e quem garante é o servidor:
+ * `entrarComGoogle` e o /callback tratam todo login pelo Google como cliente.
+ */
 export function BotaoGoogle({
   rotulo = "Continuar com o Google",
   proximo,
-  lado = "cliente",
 }: {
   rotulo?: string;
   proximo?: string;
-  /** A porta de onde veio — viaja até o /callback (src/lib/lado.ts). */
-  lado?: "cliente" | "barbearia";
 }) {
   return (
     <form action={entrarComGoogle}>
       {proximo ? <input type="hidden" name="proximo" value={proximo} /> : null}
-      <input type="hidden" name="lado" value={lado} />
       <Interno rotulo={rotulo} />
     </form>
   );

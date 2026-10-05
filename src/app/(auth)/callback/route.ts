@@ -133,13 +133,19 @@ export async function GET(request: NextRequest) {
   if (erroPerfil) console.error("[callback] falha ao ler o perfil:", erroPerfil);
 
   const temBarbearia = perfil?.role === "owner" || perfil?.role === "assistant";
-  const lado: Porta = porta === "barbearia" && temBarbearia ? "barbearia" : "cliente";
+  // Login pelo Google (troca de `code` que não é confirmação de e-mail nem
+  // redefinição de senha) é SEMPRE do lado do cliente: o painel só abre com
+  // e-mail e senha. Sem isto, um link de callback com `?lado=barbearia`
+  // montado à mão abriria o painel pelo Google.
+  const viaGoogle = !tokenHash && !confirmandoEmail && !redefinindoSenha;
+  const lado: Porta =
+    porta === "barbearia" && temBarbearia && !viaGoogle ? "barbearia" : "cliente";
 
   // Destino interno vindo do ?proximo= — nunca um domínio de fora.
   const destinoSeguro =
     proximo && proximo.startsWith("/") && !proximo.startsWith("//") ? proximo : null;
   const destino =
-    destinoSeguro ?? casaDoLado(porta, temBarbearia);
+    destinoSeguro ?? casaDoLado(viaGoogle ? "cliente" : porta, temBarbearia);
 
   const resposta = NextResponse.redirect(`${origin}${destino}`);
   resposta.cookies.set(COOKIE_LADO, lado, OPCOES_COOKIE_LADO);
