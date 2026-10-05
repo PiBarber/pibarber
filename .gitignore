@@ -12,6 +12,7 @@ build/
 .env
 .env.local
 .env*.local
+.mcp.json
 
 # .env.example NÃO entra aqui: ele é o modelo, só tem nome de variável e
 # comentário, e é o que diz a quem clonar o projeto o que precisa preencher.
@@ -36,3 +37,6 @@ dev.log
 /AUDITORIA_*.md
 /pibarber-CONTEXT.md
 /agentes/
+
+# Configuração local dos servidores MCP (pode ter token de acesso)
+.mcp.json
