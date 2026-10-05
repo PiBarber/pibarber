@@ -25,8 +25,10 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const fixas: MetadataRoute.Sitemap = [
     { url: absoluta("/"), changeFrequency: "weekly", priority: 1 },
-    { url: absoluta("/criar-conta"), changeFrequency: "monthly", priority: 0.5 },
-    { url: absoluta("/entrar"), changeFrequency: "monthly", priority: 0.3 },
+    { url: absoluta("/criar-conta-cliente"), changeFrequency: "monthly", priority: 0.5 },
+    { url: absoluta("/entrar-cliente"), changeFrequency: "monthly", priority: 0.3 },
+    { url: absoluta("/cadastrar-barbearia"), changeFrequency: "monthly", priority: 0.6 },
+    { url: absoluta("/entrar-barbeiro"), changeFrequency: "monthly", priority: 0.3 },
     { url: absoluta("/privacidade"), changeFrequency: "yearly", priority: 0.3 },
     { url: absoluta("/termos"), changeFrequency: "yearly", priority: 0.3 },
   ];

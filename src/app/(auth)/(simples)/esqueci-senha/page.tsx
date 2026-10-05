@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { FormEsqueciSenha } from "@/components/auth/FormEsqueciSenha";
-import { ladoDaPorta } from "@/lib/lado";
+import { portaDe, rotaDeEntrar } from "@/lib/lado";
 
 export const metadata: Metadata = { title: "Esqueci minha senha" };
 
@@ -12,8 +12,8 @@ export default async function EsqueciSenhaPage({
   searchParams: Promise<{ tipo?: string }>;
 }) {
   const { tipo } = await searchParams;
-  const lado = ladoDaPorta(tipo);
-  const voltar = lado === "barbearia" ? "/entrar?tipo=barbearia" : "/entrar";
+  const lado = portaDe(tipo);
+  const voltar = rotaDeEntrar(lado);
 
   return (
     <div className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-8">

@@ -1,7 +1,7 @@
 # Como promover um cliente a dono de barbearia
 
 Desde o 25_setup_barbearia.sql o barbeiro **pode se cadastrar sozinho**: em
-`/criar-conta?tipo=barbearia` ele cria a conta e a barbearia de uma vez
+`/cadastrar-barbearia` ele cria a conta e a barbearia de uma vez
 (`criarContaBarbearia` em `src/app/actions/auth.ts`). A loja nasce escondida
 (`is_active = false`) e só aparece ao público quando ele termina o setup guiado
 de `/configurar`. E-mail e telefone não se repetem entre donos.
@@ -27,7 +27,7 @@ situação torta, não para o dia a dia.
 
 1. Entre com sua conta de administrador da plataforma (a que tem
    `profiles.is_platform_admin = true`).
-2. Vá em `/admin`.
+2. Vá em `/admin/entrar` e entre com e-mail e senha (o `/admin` só abre por ali).
 3. Preencha nome do dono, e-mail, senha, nome da barbearia e o link público.
 4. Copie o e-mail e a senha gerados e entregue ao dono.
 
@@ -135,8 +135,8 @@ com cache de um request só). Então:
 - basta atualizar a página. No próximo carregamento ela já cai em `/painel`.
 
 O `middleware` e a função `rotaInicial()` mandam cada papel para a casa dele:
-`is_platform_admin` → `/admin`, `owner`/`assistant` → `/painel`, `client` →
-`/app`.
+`owner`/`assistant` → `/painel`, `client` → `/app`. O admin não tem casa
+pelo papel: o `/admin` só abre pela porta `/admin/entrar` (src/lib/lado.ts).
 
 ---
 

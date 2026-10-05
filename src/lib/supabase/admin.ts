@@ -30,6 +30,10 @@ import { envPublico, envServiceRole } from "@/lib/env";
  *      `subscriptions` não tem escrita para ninguém com sessão — senão o dono
  *      se daria um período pago pela REST. A action grava depois de
  *      requireOwnerContext(); o webhook, depois de conferir o token do Asaas.
+ *   8. o registro do aceite dos termos (src/lib/aceite-termos.ts):
+ *      `terms_acceptances` não tem escrita para ninguém com sessão — senão a
+ *      prova do aceite seria a palavra de quem aceitou. Só para a conta que o
+ *      `signUp` acabou de criar ou que acabou de provar quem é.
  *
  * REGRA: confirme o papel de quem chamou ANTES de instanciar isto.
  *

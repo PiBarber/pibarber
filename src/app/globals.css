@@ -290,6 +290,31 @@
   animation: pibarber-fade-up 0.24s ease-out both;
 }
 
+/* O painel de exemplo das telas de entrada boia devagar, levemente inclinado. */
+@keyframes pibarber-flutuar {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-10px);
+  }
+}
+
+@utility animate-flutuar {
+  transform: rotate(-3deg);
+  animation: pibarber-flutuar 7s ease-in-out infinite;
+}
+
+/* Riscado diagonal fino em latão — o fundo do lado visual das portas. */
+@utility fundo-navalha {
+  background-image: repeating-linear-gradient(
+    128deg,
+    color-mix(in oklab, var(--color-brass) 7%, transparent) 0 1px,
+    transparent 1px 15px
+  );
+}
+
 /* Quem prefere menos movimento não vê nenhum. */
 @media (prefers-reduced-motion: reduce) {
   *,

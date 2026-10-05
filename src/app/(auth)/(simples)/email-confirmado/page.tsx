@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { LinkButton } from "@/components/ui";
 import { getProfile, rotaInicial } from "@/lib/auth";
+import { portaDe, rotaDeEntrar } from "@/lib/lado";
 
 export const metadata: Metadata = {
   title: "E-mail confirmado",
@@ -27,9 +28,15 @@ export const metadata: Metadata = {
  *                 verificador do PKCE ficou no outro navegador e não há sessão
  *                 para criar. Aí o botão é o de entrar.
  */
-export default async function EmailConfirmadoPage() {
+export default async function EmailConfirmadoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lado?: string }>;
+}) {
+  // Sem sessão, o botão leva à porta de onde o cadastro veio (o /callback a repassa).
+  const { lado } = await searchParams;
   const perfil = await getProfile();
-  const destino = perfil ? rotaInicial(perfil) : "/entrar";
+  const destino = perfil ? rotaInicial(perfil) : rotaDeEntrar(portaDe(lado));
 
   return (
     <div className="rounded-card border border-line bg-surface p-6 text-center shadow-card sm:p-8">
@@ -56,6 +63,5 @@ export default async function EmailConfirmadoPage() {
 
 function rotuloDoDestino(destino: string): string {
   if (destino === "/painel") return "Ir para o painel";
-  if (destino === "/admin") return "Ir para o admin";
   return "Encontrar uma barbearia";
 }

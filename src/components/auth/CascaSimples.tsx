@@ -4,11 +4,12 @@ import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
- * Casca das telas de autenticação. Cartão centralizado, sem distração.
- * Fica FORA de /app e /painel de propósito: uma tela de escape dentro do
- * grupo de rotas protegido entraria em loop de redirect.
+ * Casca das telas de passagem da autenticação (esqueci a senha, redefinir,
+ * e-mail confirmado) e do login do admin. Cartão centralizado, sem distração.
+ *
+ * As portas de cliente e de barbeiro têm a casca delas (`TelaDividida`).
  */
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export function CascaSimples({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <header className="flex items-center justify-between px-4 py-4 sm:px-6">

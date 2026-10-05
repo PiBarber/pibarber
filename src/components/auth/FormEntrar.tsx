@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 
-import { entrar } from "@/app/actions/auth";
+import { entrar, entrarAdmin } from "@/app/actions/auth";
 import { Button, Field, Input } from "@/components/ui";
 import type { Lado } from "@/lib/lado";
 
@@ -26,11 +26,13 @@ export function FormEntrar({
   proximo,
   erroInicial,
   lado = "cliente",
+  rotuloBotao = "Entrar",
 }: {
   proximo?: string;
   erroInicial?: string;
-  /** A porta: decide o lado da sessão (src/lib/lado.ts). */
+  /** A porta: decide o lado da sessão (src/lib/lado.ts). "admin" usa `entrarAdmin`. */
   lado?: Lado;
+  rotuloBotao?: string;
 }) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -66,7 +68,10 @@ export function FormEntrar({
     setErros({});
 
     iniciar(async () => {
-      const resultado = await entrar({ email, senha, proximo, lado });
+      const resultado =
+        lado === "admin"
+          ? await entrarAdmin({ email, senha, proximo })
+          : await entrar({ email, senha, proximo, lado });
 
       // Só chega aqui em caso de erro — o sucesso sai da página por redirect().
       emVoo.current = false;
@@ -149,15 +154,18 @@ export function FormEntrar({
         />
       </Field>
 
-      <Link
-        href={lado === "barbearia" ? "/esqueci-senha?tipo=barbearia" : "/esqueci-senha"}
-        className="-mt-2 self-end text-sm font-medium text-brass hover:text-brass-deep"
-      >
-        Esqueci minha senha
-      </Link>
+      {/* O admin não tem atalho de recuperação: a porta dele é só e-mail e senha. */}
+      {lado !== "admin" ? (
+        <Link
+          href={lado === "barbearia" ? "/esqueci-senha?tipo=barbearia" : "/esqueci-senha"}
+          className="-mt-2 self-end text-sm font-medium text-brass hover:text-brass-deep"
+        >
+          Esqueci minha senha
+        </Link>
+      ) : null}
 
       <Button type="submit" tamanho="lg" larguraTotal carregando={enviando}>
-        Entrar
+        {rotuloBotao}
       </Button>
     </form>
   );

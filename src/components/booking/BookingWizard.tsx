@@ -428,7 +428,7 @@ export function BookingWizard({
             // A loja exige cadastro. O botão vira o caminho para a conta — e
             // o `proximo` traz a pessoa de volta para esta página depois.
             <Link
-              href={`/entrar?proximo=${encodeURIComponent(`/b/${slug}/agendar`)}`}
+              href={`/entrar-cliente?proximo=${encodeURIComponent(`/b/${slug}/agendar`)}`}
               className="inline-flex h-[50px] w-full items-center justify-center rounded-field bg-brass text-base font-medium text-brass-ink"
             >
               Entrar para confirmar
@@ -1025,7 +1025,7 @@ function ConfirmacaoFinal({
         </Button>
 
         <Link
-          href={token ? `/a/${token}` : logado ? "/app/agendamentos" : "/criar-conta"}
+          href={token ? `/a/${token}` : logado ? "/app/agendamentos" : "/criar-conta-cliente"}
           className="inline-flex h-[50px] w-full items-center justify-center rounded-field bg-brass text-base font-medium text-brass-ink"
         >
           {token
@@ -1037,7 +1037,7 @@ function ConfirmacaoFinal({
 
         {token ? (
           <Link
-            href="/criar-conta"
+            href="/criar-conta-cliente"
             className="inline-flex h-11 w-full items-center justify-center text-sm font-medium text-ink-soft hover:text-ink"
           >
             Criar conta para não depender do link
@@ -1152,7 +1152,7 @@ function EsperaDialog({
         descricao="Precisamos de uma conta para te avisar quando vagar."
         rodape={
           <Link
-            href="/entrar"
+            href="/entrar-cliente"
             className="inline-flex h-[50px] w-full items-center justify-center rounded-field bg-brass text-base font-medium text-brass-ink"
           >
             Entrar ou criar conta

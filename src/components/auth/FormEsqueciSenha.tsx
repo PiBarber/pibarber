@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 
 import { pedirNovaSenha } from "@/app/actions/auth";
 import { Button, Field, Input } from "@/components/ui";
-import type { Lado } from "@/lib/lado";
+import type { Porta } from "@/lib/lado";
 
 /** Pede o link de redefinir a senha. A resposta é neutra — ver `pedirNovaSenha`. */
-export function FormEsqueciSenha({ lado }: { lado: Lado }) {
+export function FormEsqueciSenha({ lado }: { lado: Porta }) {
   const [email, setEmail] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviado, setEnviado] = useState<string | null>(null);

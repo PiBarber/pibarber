@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/Logo";
 import { EMAIL_COMERCIAL, LINK_WHATSAPP_COMERCIAL, MARCA, PRECO } from "@/lib/config";
+import { dataDaVersao, VERSAO_TERMOS } from "@/lib/termos";
 
 /**
  * Termos de Serviço — página pública, estática, sem login.
@@ -33,7 +34,8 @@ export const metadata: Metadata = {
 };
 
 /** Atualize junto com o texto. */
-const ATUALIZADO_EM = "24 de setembro de 2026";
+// A data mora em src/lib/termos.ts: trocá-la pede o aceite de novo.
+const ATUALIZADO_EM = dataDaVersao(VERSAO_TERMOS);
 
 export default function TermosDeServico() {
   return (

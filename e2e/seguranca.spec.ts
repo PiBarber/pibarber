@@ -93,7 +93,7 @@ test.describe("Admin vendo como o dono", () => {
   }) => {
     const loja = await criarBarbeariaPronta();
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
     await expect(page).toHaveURL(/\/admin/);
 
     await page.goto(`/admin/barbearias/${loja.id}`);

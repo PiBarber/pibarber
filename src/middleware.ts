@@ -2,7 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/database.types";
-import { COOKIE_LADO, ladoDaSessao } from "@/lib/lado";
+import {
+  casaDoLado,
+  COOKIE_LADO,
+  ladoDaSessao,
+  ROTA_CADASTRAR_BARBEARIA,
+  ROTA_CRIAR_CONTA_CLIENTE,
+  ROTA_ENTRAR_ADMIN,
+  ROTA_ENTRAR_BARBEIRO,
+  ROTA_ENTRAR_CLIENTE,
+} from "@/lib/lado";
+import { aceiteEmDia, ROTA_ACEITAR_TERMOS } from "@/lib/termos";
 import { COOKIE_VISUALIZACAO, lojaDoCookie } from "@/lib/visualizacao";
 
 /**
@@ -24,7 +34,17 @@ const PREFIXOS_APP = ["/app"];
 // /assinatura idem: é para onde o painel manda quando o plano vence.
 const PREFIXOS_PAINEL = ["/painel", "/configurar", "/assinatura"];
 const PREFIXOS_ADMIN = ["/admin"];
-const ROTAS_AUTENTICACAO = ["/entrar", "/criar-conta"];
+// As portas, mais os endereços antigos (/entrar, /criar-conta), que só
+// redirecionam para as novas.
+const ROTAS_AUTENTICACAO = [
+  ROTA_ENTRAR_CLIENTE,
+  ROTA_CRIAR_CONTA_CLIENTE,
+  ROTA_ENTRAR_BARBEIRO,
+  ROTA_CADASTRAR_BARBEARIA,
+  ROTA_ENTRAR_ADMIN,
+  "/entrar",
+  "/criar-conta",
+];
 
 function comecaCom(caminho: string, prefixos: string[]): boolean {
   return prefixos.some((p) => caminho === p || caminho.startsWith(`${p}/`));
@@ -66,21 +86,26 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const caminho = request.nextUrl.pathname;
+  // O login do admin mora dentro de /admin, mas é porta, não área protegida.
+  const ehLoginAdmin = caminho === ROTA_ENTRAR_ADMIN;
+  const emAdmin = comecaCom(caminho, PREFIXOS_ADMIN) && !ehLoginAdmin;
   const protegida =
-    comecaCom(caminho, PREFIXOS_APP) ||
-    comecaCom(caminho, PREFIXOS_PAINEL) ||
-    comecaCom(caminho, PREFIXOS_ADMIN);
+    comecaCom(caminho, PREFIXOS_APP) || comecaCom(caminho, PREFIXOS_PAINEL) || emAdmin;
 
   // --- Sem sessão ----------------------------------------------------------
   if (!user) {
     if (protegida) {
       const destino = request.nextUrl.clone();
-      destino.pathname = "/entrar";
+      // A porta certa (src/lib/lado.ts): o admin tem a dele; painel, setup e
+      // assinatura são da barbearia; o app é do cliente.
+      destino.pathname = emAdmin
+        ? ROTA_ENTRAR_ADMIN
+        : comecaCom(caminho, PREFIXOS_APP)
+          ? ROTA_ENTRAR_CLIENTE
+          : ROTA_ENTRAR_BARBEIRO;
       // Guarda para onde a pessoa queria ir, e devolve para lá depois do login.
+      destino.search = "";
       destino.searchParams.set("proximo", caminho);
-      // A porta certa: painel, setup, assinatura e admin são da barbearia;
-      // o app é do cliente (src/lib/lado.ts).
-      if (!comecaCom(caminho, PREFIXOS_APP)) destino.searchParams.set("tipo", "barbearia");
       return NextResponse.redirect(destino);
     }
     return resposta;
@@ -93,7 +118,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: perfil, error } = await supabase
     .from("profiles")
-    .select("role, is_platform_admin")
+    .select("role, is_platform_admin, terms_version, privacy_version")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -107,44 +132,65 @@ export async function middleware(request: NextRequest) {
 
   // O lado da sessão foi escolhido pela porta do login (src/lib/lado.ts).
   // Quem tem barbearia pode estar de qualquer lado; quem é só cliente, só do
-  // lado de cliente — o cookie escolhe a ÁREA, não dá permissão.
+  // lado de cliente; "admin" só para admin — o cookie escolhe a ÁREA, não dá
+  // permissão.
   const temBarbearia = papel === "owner" || papel === "assistant";
-  const lado = temBarbearia
-    ? ladoDaSessao(request.cookies.get(COOKIE_LADO)?.value, true)
-    : "cliente";
+  const lado = ladoDaSessao(request.cookies.get(COOKIE_LADO)?.value, { temBarbearia, ehAdmin });
 
-  const casa = ehAdmin ? "/admin" : lado === "barbearia" ? "/painel" : "/app";
+  const casa = casaDoLado(lado, temBarbearia);
 
-  // Quem já está logado não fica olhando tela de login.
-  if (ROTAS_AUTENTICACAO.includes(caminho)) {
+  // Quem já está logado não fica olhando tela de login. A exceção é o login do
+  // admin para quem ainda não está do lado admin: entrar ali troca a sessão.
+  if (ROTAS_AUTENTICACAO.includes(caminho) && !(ehLoginAdmin && lado !== "admin")) {
     const destino = request.nextUrl.clone();
     destino.pathname = casa;
     destino.search = "";
     return NextResponse.redirect(destino);
   }
 
-  // --- Cada prefixo com o seu papel ----------------------------------------
+  // --- Cada prefixo com o seu lado -----------------------------------------
   const podeApp = lado === "cliente";
   const podePainel = temBarbearia && lado === "barbearia";
+  const podeAdmin = lado === "admin";
 
   // "Ver como o dono": o admin entra no /painel (e só nele — não no setup nem
   // na assinatura, que são do dono) quando o cookie de visualização existe.
   // Quem confere de verdade é `requireShopContext()`, que só aceita o cookie
   // de admin e recusa toda ação nesse modo.
   const visualizando =
-    ehAdmin &&
+    podeAdmin &&
     comecaCom(caminho, ["/painel"]) &&
     lojaDoCookie(request.cookies.get(COOKIE_VISUALIZACAO)?.value) !== null;
+
+  // Admin fora do lado admin vai para a porta dele, não para a casa do lado.
+  if (emAdmin && !podeAdmin && ehAdmin) {
+    const destino = request.nextUrl.clone();
+    destino.pathname = ROTA_ENTRAR_ADMIN;
+    destino.search = "";
+    destino.searchParams.set("proximo", caminho);
+    return NextResponse.redirect(destino);
+  }
 
   const negado =
     (comecaCom(caminho, PREFIXOS_APP) && !podeApp) ||
     (comecaCom(caminho, PREFIXOS_PAINEL) && !podePainel && !visualizando) ||
-    (comecaCom(caminho, PREFIXOS_ADMIN) && !ehAdmin);
+    (emAdmin && !podeAdmin);
 
   if (negado) {
     const destino = request.nextUrl.clone();
     destino.pathname = casa;
     destino.search = "";
+    return NextResponse.redirect(destino);
+  }
+
+  // --- O aceite dos termos em dia (src/lib/termos.ts) ----------------------
+  // Só no app e no painel. O /admin é a equipe da plataforma, e o "ver como o
+  // dono" é o admin olhando, não o dono aceitando.
+  if (!emAdmin && !visualizando && !aceiteEmDia(perfil)) {
+    const destino = request.nextUrl.clone();
+    destino.pathname = ROTA_ACEITAR_TERMOS;
+    destino.search = "";
+    destino.searchParams.set("proximo", `${caminho}${request.nextUrl.search}`);
     return NextResponse.redirect(destino);
   }
 

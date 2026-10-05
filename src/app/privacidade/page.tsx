@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { EMAIL_COMERCIAL, LINK_WHATSAPP_COMERCIAL, MARCA } from "@/lib/config";
 import { dadosSuporte } from "@/lib/suporte";
+import { dataDaVersao, VERSAO_PRIVACIDADE } from "@/lib/termos";
 
 /**
  * Política de Privacidade — página pública, estática, sem login.
@@ -32,7 +33,8 @@ export const metadata: Metadata = {
 };
 
 /** Atualize junto com o texto. É a data que o rodapé e a lei pedem. */
-const ATUALIZADO_EM = "24 de setembro de 2026";
+// A data mora em src/lib/termos.ts: trocá-la pede o aceite de novo.
+const ATUALIZADO_EM = dataDaVersao(VERSAO_PRIVACIDADE);
 
 export default function PoliticaDePrivacidade() {
   const suporte = dadosSuporte();

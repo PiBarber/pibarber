@@ -59,7 +59,7 @@ export const VISOES: VisaoDoProduto[] = [
     // Vai para o cadastro de BARBEARIA, não para /criar-conta puro: sem o
     // `?tipo=`, o dono cairia no formulário de cliente e criaria uma conta que
     // não é a dele.
-    cta: { texto: "Quero na minha barbearia", href: "/criar-conta?tipo=barbearia" },
+    cta: { texto: "Quero na minha barbearia", href: "/cadastrar-barbearia" },
     telas: [
       {
         arquivo: "painel-hoje",
@@ -152,7 +152,7 @@ export const VISOES: VisaoDoProduto[] = [
       "Ele agenda o horário sozinho, de madrugada, sem te ligar. Instala pelo navegador, " +
       "na tela inicial do celular — sem passar por loja de aplicativos.",
     formato: "celular",
-    cta: { texto: "Criar minha conta", href: "/criar-conta" },
+    cta: { texto: "Criar minha conta", href: "/criar-conta-cliente" },
     telas: [
       {
         arquivo: "app-inicio",

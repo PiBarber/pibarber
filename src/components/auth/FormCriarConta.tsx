@@ -4,8 +4,10 @@ import { CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
 import { criarConta } from "@/app/actions/auth";
+import { CaixaTermos } from "@/components/auth/CaixaTermos";
 import { Button, Field, Input } from "@/components/ui";
 import { erroDeTelefone } from "@/lib/telefone";
+import { MENSAGEM_TERMOS } from "@/lib/termos";
 import { mascaraTelefone } from "@/lib/utils";
 
 /**
@@ -23,7 +25,7 @@ import { mascaraTelefone } from "@/lib/utils";
  * problema antes de tentar enviar não chega a errar.
  */
 
-type Campo = "nome" | "email" | "telefone" | "senha" | "confirmacao";
+type Campo = "nome" | "email" | "telefone" | "senha" | "confirmacao" | "termos";
 type Erros = Partial<Record<Campo, string>>;
 
 export function FormCriarConta() {
@@ -32,6 +34,7 @@ export function FormCriarConta() {
   const [telefone, setTelefone] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
+  const [termos, setTermos] = useState(false);
 
   const [erros, setErros] = useState<Erros>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
@@ -52,6 +55,7 @@ export function FormCriarConta() {
     telefone: useRef<HTMLInputElement>(null),
     senha: useRef<HTMLInputElement>(null),
     confirmacao: useRef<HTMLInputElement>(null),
+    termos: useRef<HTMLInputElement>(null),
   };
 
   /** Some com o erro do campo assim que a pessoa começa a corrigi-lo. */
@@ -91,13 +95,25 @@ export function FormCriarConta() {
       refs.telefone.current?.focus();
       return;
     }
+    if (!termos) {
+      setErros({ termos: MENSAGEM_TERMOS });
+      refs.termos.current?.focus();
+      return;
+    }
 
     emVoo.current = true;
     setErroGeral(null);
     setErros({});
 
     iniciar(async () => {
-      const resultado = await criarConta({ nome, email, telefone, senha, confirmacao });
+      const resultado = await criarConta({
+        nome,
+        email,
+        telefone,
+        senha,
+        confirmacao,
+        aceitouTermos: termos,
+      });
 
       // Libera para nova tentativa. Nenhum campo é limpo: o caminho de erro
       // devolve a pessoa exatamente onde ela estava.
@@ -263,6 +279,16 @@ export function FormCriarConta() {
           onBlur={(e) => conferirSenhas(senha, e.target.value)}
         />
       </Field>
+
+      <CaixaTermos
+        marcada={termos}
+        aoMudar={(marcada) => {
+          setTermos(marcada);
+          limpar("termos");
+        }}
+        erro={erros.termos}
+        inputRef={refs.termos}
+      />
 
       <Button type="submit" tamanho="lg" larguraTotal carregando={enviando}>
         Criar minha conta
