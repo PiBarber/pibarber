@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Clock,
   HandCoins,
+  Minus,
   MessageCircle,
   PhoneOff,
   Scissors,
@@ -16,10 +17,12 @@ import {
   UserRound,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SecaoLembretes } from "@/components/landing/SecaoLembretes";
 import { VejaPorDentro } from "@/components/landing/VejaPorDentro";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -41,9 +44,9 @@ export const metadata: Metadata = {
     absolute: "Sistema de agendamento para barbearia — agenda, caixa e comissão",
   },
   description:
-    "Programa para barbearia com agenda online, ficha de cliente, caixa, fiado e " +
-    "controle de comissão. Seus clientes agendam sozinhos pelo celular. " +
-    `${PRECO.diasGratis} dias grátis, sem cartão.`,
+    "Programa para barbearia com agenda online, lembrete no WhatsApp oficial, ficha de " +
+    "cliente, caixa, fiado e controle de comissão. Seus clientes agendam sozinhos pelo " +
+    `celular. ${PRECO.diasGratis} dias grátis, sem cartão.`,
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -52,8 +55,8 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     title: "Sistema de agendamento para barbearia — PiBarber",
     description:
-      "Agenda online, caixa, fiado e controle de comissão numa tela só. " +
-      "Seus clientes agendam sozinhos pelo celular.",
+      "Agenda online, lembrete no WhatsApp oficial, caixa, fiado e controle de comissão " +
+      "numa tela só. Seus clientes agendam sozinhos pelo celular.",
     // A imagem de compartilhamento é uma captura real do painel, a mesma que
     // abre o "veja por dentro". Quem recebe o link no WhatsApp vê o produto,
     // não um cartão com o logotipo.
@@ -153,21 +156,21 @@ const RECURSOS = [
 const PASSOS = [
   {
     numero: "1",
-    titulo: "A gente cadastra sua barbearia",
+    titulo: "Você cadastra em poucos minutos",
     texto:
-      "Você manda o nome, o endereço, os serviços e a equipe. Em pouco tempo sua barbearia está no ar com link próprio.",
+      "Crie a conta e siga o passo a passo: horários, serviços e equipe. Prefere fazer junto? Chama no WhatsApp que a gente configura com você.",
   },
   {
     numero: "2",
     titulo: "Você divulga o link",
     texto:
-      "Põe na bio do Instagram e manda no grupo do WhatsApp. Quem clicar já agenda direto, sem precisar falar com ninguém.",
+      "Sua barbearia ganha uma página própria — pibarber.app/b/sua-barbearia — com horários, serviços, equipe, avaliações e o botão de agendar. Põe na bio do Instagram e manda no grupo do WhatsApp.",
   },
   {
     numero: "3",
     titulo: "Você opera do celular",
     texto:
-      "Abre a agenda, conclui o atendimento, recebe o pagamento. No fim do dia o caixa já está fechado.",
+      "O cliente agenda e recebe o lembrete sozinho. Você abre a agenda, conclui o atendimento e recebe. No fim do dia o caixa já está fechado.",
   },
 ] as const;
 
@@ -175,6 +178,8 @@ const INCLUI = [
   "Agenda por profissional, sem limite de agendamento",
   "App para os seus clientes agendarem sozinhos",
   "Página pública da barbearia, com link para a bio",
+  "Lembrete e aviso de cancelamento no WhatsApp oficial",
+  "E-mails automáticos, com o lembrete de voltar para quem sumiu",
   "Ficha de cliente com histórico e observações",
   "Caixa, fiado e comissão",
   "Relatórios de faturamento e desempenho",
@@ -182,7 +187,108 @@ const INCLUI = [
   "Lista de espera e avaliações",
 ] as const;
 
+/**
+ * Caderno × WhatsApp na mão × PiBarber. Sem citar concorrente pelo nome: só o
+ * que dá para afirmar do PiBarber e do jeito que a barbearia já trabalha.
+ * `true` = faz, `false` = não faz, `"parcial"` = depende de alguém lembrar.
+ */
+const COMPARACAO: {
+  item: string;
+  caderno: boolean | "parcial";
+  zap: boolean | "parcial";
+}[] = [
+  { item: "O cliente marca sozinho, até de madrugada", caderno: false, zap: false },
+  { item: "Lembrete automático na véspera", caderno: false, zap: "parcial" },
+  { item: "Impossível marcar dois no mesmo horário", caderno: "parcial", zap: "parcial" },
+  { item: "Seu número pessoal fica de fora", caderno: true, zap: false },
+  { item: "Quem deve, quanto e desde quando", caderno: "parcial", zap: false },
+  { item: "Comissão e caixa calculados sozinhos", caderno: false, zap: false },
+  { item: "Chama de volta quem sumiu", caderno: false, zap: "parcial" },
+];
+
+/**
+ * As dúvidas que travam o DONO antes de criar a conta. As do cliente moram em
+ * src/lib/faq.ts (/app/perfil/ajuda). Cada resposta tem que bater com os
+ * Termos e com o que o sistema faz — mudou lá, muda aqui.
+ */
+const FAQ_DONO = [
+  {
+    pergunta: "Preciso de cartão de crédito para testar?",
+    resposta: `Não. São ${PRECO.diasGratis} dias grátis, com tudo liberado, sem cadastrar cartão. Só no fim do teste você escolhe se quer assinar.`,
+  },
+  {
+    pergunta: "Tem fidelidade? Como eu cancelo?",
+    resposta:
+      "No plano mensal não tem fidelidade: cancele quando quiser, pelo próprio painel. No semestral e no anual você paga menos, tem 7 dias para desistir com o dinheiro de volta, e depois disso o acesso segue até o fim do período.",
+  },
+  {
+    pergunta: "Vocês cobram taxa por agendamento ou porcentagem do que eu faturo?",
+    resposta:
+      "Não. O preço é fixo e depende só de quantos profissionais atendem na sua agenda. Agende quanto quiser.",
+  },
+  {
+    pergunta: "O lembrete de WhatsApp usa o meu número?",
+    resposta:
+      "Não. As mensagens saem do número verificado do PiBarber, pela API oficial do WhatsApp da Meta. Seu número não é usado em nenhum momento, então não corre risco de bloqueio, e você não precisa deixar celular nenhum ligado.",
+  },
+  {
+    pergunta: "Meus clientes precisam baixar um aplicativo na loja?",
+    resposta:
+      "Não. O cliente abre o link da sua barbearia no navegador e já agenda. Se quiser, adiciona à tela de início e passa a abrir como um aplicativo.",
+  },
+  {
+    pergunta: "E o cliente que prefere marcar pessoalmente ou por ligação?",
+    resposta:
+      "Continua do mesmo jeito. Você lança o horário na agenda em dois toques, e a ficha do cliente nasce junto.",
+  },
+  {
+    pergunta: "Como ficam os clientes que eu já tenho?",
+    resposta:
+      "Cada cliente vira uma ficha na primeira vez que agenda pelo link ou que você lança o horário dele. Não precisa digitar o caderno inteiro antes de começar.",
+  },
+  {
+    pergunta: "Meu assistente vai ver quanto eu faturo?",
+    resposta:
+      "Não. O acesso do assistente mostra agenda, clientes e fiado, mas não faturamento, comissão nem relatórios — e isso é bloqueado no banco de dados, não só escondido na tela.",
+  },
+  {
+    pergunta: "O cliente pode parar de receber as mensagens?",
+    resposta:
+      "Pode. No WhatsApp, basta responder PARAR. No e-mail de lembrete de voltar, tem o link de descadastro. E você também liga ou desliga cada aviso nas Configurações do painel.",
+  },
+  {
+    pergunta: "Meus dados e os dos meus clientes ficam seguros?",
+    resposta:
+      "Cada barbearia só enxerga os próprios dados, com a regra aplicada no banco. Seguimos a LGPD: a política de privacidade diz o que guardamos e por quê, e o cliente pode excluir a conta dele pelo app.",
+  },
+] as const;
+
 /* ========================================================================== */
+
+/** As perguntas do dono como FAQPage — o Google pode mostrá-las no resultado. */
+function dadosFaq() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ_DONO.map((f) => ({
+      "@type": "Question",
+      name: f.pergunta,
+      acceptedAnswer: { "@type": "Answer", text: f.resposta },
+    })),
+  };
+}
+
+function MarcaComparacao({ valor }: { valor: boolean | "parcial" }) {
+  if (valor === true) {
+    return <Check className="mx-auto h-5 w-5 text-money" aria-label="Sim" />;
+  }
+  if (valor === "parcial") {
+    return (
+      <Minus className="mx-auto h-5 w-5 text-ink-faint" aria-label="Depende de alguém lembrar" />
+    );
+  }
+  return <X className="mx-auto h-5 w-5 text-danger" aria-label="Não" />;
+}
 
 /**
  * Dados estruturados — é como o Google entende que esta página descreve um
@@ -206,8 +312,8 @@ function dadosEstruturados(planos: PlanoPublico[]) {
     applicationSubCategory: "Sistema de agendamento para barbearia",
     operatingSystem: "Web, Android, iOS",
     description:
-      "Programa para barbearia com agenda online, ficha de cliente, caixa, fiado e " +
-      "controle de comissão. Os clientes agendam sozinhos pelo celular.",
+      "Programa para barbearia com agenda online, lembrete no WhatsApp oficial, ficha de " +
+      "cliente, caixa, fiado e controle de comissão. Os clientes agendam sozinhos pelo celular.",
     inLanguage: "pt-BR",
     url: absoluta("/"),
     screenshot: absoluta("/capturas/painel-hoje.png"),
@@ -229,6 +335,8 @@ function dadosEstruturados(planos: PlanoPublico[]) {
     featureList: [
       "Agenda por profissional, com bloqueio de horário sobreposto",
       "Agendamento online pelo celular do cliente",
+      "Lembrete e aviso de cancelamento pelo WhatsApp oficial (API da Meta)",
+      "E-mail automático de confirmação e de lembrete de voltar",
       "Ficha de cliente com histórico e observações",
       "Caixa com pagamento dividido",
       "Controle de fiado",
@@ -251,6 +359,10 @@ export default async function LandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(dadosEstruturados(planos)) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(dadosFaq()) }}
+      />
 
       {/* ---------- Topo ---------- */}
       <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur">
@@ -260,7 +372,7 @@ export default async function LandingPage() {
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Em 375px a linha logo + tema + os dois botões estoura por ~11px
                 e alarga o documento inteiro. Quem sai no celular é o TEMA: os
-                dois botões são as duas portas do barbeiro — "Criar conta" para
+                dois botões são as duas portas do barbeiro — "Teste grátis" para
                 quem chega, "Entrar" para quem já tem barbearia — e nenhuma das
                 duas pode sumir. O tema continua nas telas de login e cadastro.
 
@@ -274,11 +386,13 @@ export default async function LandingPage() {
             <LinkButton href="/entrar-barbeiro" variante="ghost" tamanho="sm">
               Entrar
             </LinkButton>
-            {/* Da landing, "Criar conta" é SEMPRE de barbearia: a landing vende
+            {/* Da landing, "Teste grátis" é SEMPRE de barbearia: a landing vende
                 o sistema para o dono. O cliente cria a conta dele pelo fluxo
                 de agendamento, que leva para /criar-conta sem o `?tipo=`. */}
+            {/* "Teste grátis" e não "Criar conta": o topo acompanha a rolagem,
+                então a oferta fica à vista na página inteira. */}
             <LinkButton href="/cadastrar-barbearia" variante="primary" tamanho="sm">
-              Criar conta
+              Teste grátis
             </LinkButton>
           </div>
         </div>
@@ -307,10 +421,10 @@ export default async function LandingPage() {
               </h1>
 
               <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
-                Sistema de agendamento para barbearia com agenda online, ficha de cliente, caixa,
-                fiado e controle de comissão numa tela só. Seu cliente marca o horário sozinho pelo
-                celular, e no fim do dia o caixa já está fechado — sem caderno, sem planilha, sem
-                achismo.
+                Sistema de agendamento para barbearia com agenda online, lembrete automático no
+                WhatsApp oficial, ficha de cliente, caixa, fiado e controle de comissão numa tela
+                só. Seu cliente marca o horário sozinho pelo celular, recebe o lembrete na véspera,
+                e no fim do dia o caixa já está fechado — sem caderno, sem planilha, sem achismo.
               </p>
 
               {/* Três CTAs, duas audiências. O dono é o primário e vai direto
@@ -331,7 +445,7 @@ export default async function LandingPage() {
                   className="sm:w-auto"
                   iconeEsquerda={<Store className="h-5 w-5" aria-hidden />}
                 >
-                  Quero na minha barbearia
+                  Testar {PRECO.diasGratis} dias grátis
                 </LinkButton>
                 <LinkButton
                   href="#como-funciona"
@@ -355,9 +469,18 @@ export default async function LandingPage() {
                 </LinkButton>
               </div>
 
-              <p className="mt-4 text-sm text-ink-faint">
-                {PRECO.diasGratis} dias grátis para testar. Sem cartão.
-              </p>
+              {/* A oferta à vista, logo abaixo de onde a pessoa decide clicar:
+                  é ela que derruba o "vou ter que pagar ou deixar o cartão?". */}
+              <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-ink">
+                {[`${PRECO.diasGratis} dias grátis`, "Sem cartão de crédito", "Sem compromisso"].map(
+                  (selo) => (
+                    <li key={selo} className="flex items-center gap-1.5">
+                      <Check className="h-4 w-4 shrink-0 text-money" aria-hidden />
+                      {selo}
+                    </li>
+                  ),
+                )}
+              </ul>
             </div>
 
             {/* Prévia da tela Hoje — o que o dono abre 50 vezes por dia. */}
@@ -440,7 +563,7 @@ export default async function LandingPage() {
         <section id="recursos" className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
           <div className="max-w-2xl">
             <h2 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
-              O que um software para barbearia precisa ter — e nada além disso.
+              Tudo o que a barbearia usa no dia a dia, numa tela só.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
               Nada de módulo que você nunca vai abrir. Se o barbeiro não usa toda semana, não está
@@ -463,6 +586,9 @@ export default async function LandingPage() {
             ))}
           </div>
         </section>
+
+        {/* ---------- Lembretes: WhatsApp oficial e e-mail ---------- */}
+        <SecaoLembretes />
 
         {/* ---------- Veja por dentro ----------
             Sem borda e sem `bg-surface`: a seção seguinte ("Como funciona") já é
@@ -492,7 +618,8 @@ export default async function LandingPage() {
                 Do primeiro contato ao primeiro agendamento.
               </h2>
               <p className="mt-4 text-base leading-relaxed text-ink-soft">
-                Você não precisa configurar nada sozinho. A gente monta e te entrega funcionando.
+                Você configura sozinho em poucos minutos, com o passo a passo. Se preferir, a gente
+                faz junto com você pelo WhatsApp.
               </p>
             </div>
 
@@ -620,6 +747,94 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* ---------- Comparação ---------- */}
+        <section id="comparacao" className="border-y border-line bg-surface">
+          <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-20">
+            <div className="max-w-2xl">
+              <h2 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
+                Caderno, WhatsApp na mão ou PiBarber?
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-ink-soft">
+                O caderno e o WhatsApp funcionam até onde alguém lembra de tudo. O que o sistema
+                faz sozinho, ninguém precisa lembrar.
+              </p>
+            </div>
+
+            {/* Tabela de verdade (leitor de tela lê linha e coluna). No celular,
+                as três colunas de marca são estreitas e o texto quebra. */}
+            <div className="mt-10 overflow-hidden rounded-card border border-line bg-bg">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line text-ink-soft">
+                    <th scope="col" className="p-3 text-left font-medium sm:p-4">
+                      <span className="sr-only">Recurso</span>
+                    </th>
+                    <th scope="col" className="w-12 px-1 py-3 text-center text-[11px] font-medium leading-tight sm:w-24 sm:p-4 sm:text-sm">
+                      Caderno
+                    </th>
+                    <th scope="col" className="w-12 px-1 py-3 text-center text-[11px] font-medium leading-tight sm:w-24 sm:p-4 sm:text-sm">
+                      WhatsApp na mão
+                    </th>
+                    <th
+                      scope="col"
+                      className="w-12 bg-brass-soft px-1 py-3 text-center text-[11px] font-semibold leading-tight text-brass-deep sm:w-24 sm:p-4 sm:text-sm"
+                    >
+                      {MARCA.nome}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {COMPARACAO.map((linha) => (
+                    <tr key={linha.item}>
+                      <th scope="row" className="p-3 text-left font-normal text-ink sm:p-4">
+                        {linha.item}
+                      </th>
+                      <td className="px-1 py-3 sm:p-4">
+                        <MarcaComparacao valor={linha.caderno} />
+                      </td>
+                      <td className="px-1 py-3 sm:p-4">
+                        <MarcaComparacao valor={linha.zap} />
+                      </td>
+                      <td className="bg-brass-soft/60 px-1 py-3 sm:p-4">
+                        <MarcaComparacao valor={true} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-ink-faint">
+              <Minus className="inline h-3.5 w-3.5 align-text-bottom" aria-hidden /> = só se
+              alguém lembrar de fazer na mão.
+            </p>
+          </div>
+        </section>
+
+        {/* ---------- Dúvidas do dono ----------
+            <details> nativo: abre sem JavaScript, e as respostas fechadas
+            continuam no HTML para o Google (o FAQPage acima declara as mesmas). */}
+        <section id="duvidas" className="mx-auto max-w-3xl px-4 py-14 sm:px-6 sm:py-20">
+          <h2 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
+            Perguntas de quem está pensando em começar.
+          </h2>
+          <div className="mt-8 divide-y divide-line rounded-card border border-line bg-surface">
+            {FAQ_DONO.map((f) => (
+              <details key={f.pergunta} className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 text-left text-base font-medium text-ink sm:p-5 [&::-webkit-details-marker]:hidden">
+                  {f.pergunta}
+                  <ArrowRight
+                    className="h-4 w-4 shrink-0 text-brass transition-transform group-open:rotate-90"
+                    aria-hidden
+                  />
+                </summary>
+                <p className="px-4 pb-4 text-sm leading-relaxed text-ink-soft sm:px-5 sm:pb-5">
+                  {f.resposta}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         {/* ---------- Contato ---------- */}
         <section id="contato" className="border-t border-line bg-surface">
           <div className="mx-auto max-w-3xl px-4 py-14 text-center sm:px-6 sm:py-20">
@@ -678,6 +893,12 @@ export default async function LandingPage() {
               Recursos
             </a>
             <a
+              href="#lembretes"
+              className="inline-flex h-11 items-center px-3 transition-colors hover:text-brass"
+            >
+              Lembretes
+            </a>
+            <a
               href="#por-dentro"
               className="inline-flex h-11 items-center px-3 transition-colors hover:text-brass"
             >
@@ -694,6 +915,12 @@ export default async function LandingPage() {
               className="inline-flex h-11 items-center px-3 transition-colors hover:text-brass"
             >
               Preço
+            </a>
+            <a
+              href="#duvidas"
+              className="inline-flex h-11 items-center px-3 transition-colors hover:text-brass"
+            >
+              Dúvidas
             </a>
             <a
               href={ZAP}
@@ -727,6 +954,19 @@ export default async function LandingPage() {
           </p>
         </div>
       </footer>
+
+      {/* Botão flutuante do WhatsApp comercial: quem está decidindo tira a
+          dúvida na hora, de qualquer ponto da página. Fica acima do rodapé
+          (z-40, como o topo) e respeita a área segura do iPhone. */}
+      <a
+        href={ZAP}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Falar com a gente no WhatsApp"
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-money text-bg shadow-float transition-transform hover:scale-105 active:scale-95"
+      >
+        <MessageCircle className="h-6 w-6" aria-hidden />
+      </a>
     </div>
   );
 }
