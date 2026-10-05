@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 
+import { RastroDeNavegacao } from "@/components/RastroDeNavegacao";
 import { RegistrarServiceWorker } from "@/components/RegistrarServiceWorker";
 import { urlDoSite } from "@/lib/env";
 import { SCRIPT_TEMA } from "@/lib/theme";
@@ -92,6 +93,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         {/* Só habilita "Adicionar à tela de início". Sem cache offline. */}
         <RegistrarServiceWorker />
+        {/* De onde a pessoa veio — para o "voltar" da página da barbearia. */}
+        <RastroDeNavegacao />
       </body>
     </html>
   );

@@ -8,6 +8,7 @@ import {
   Check,
   Clock,
   Copy,
+  UserRound,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { agendar, entrarNaEspera, horariosDisponiveis } from "@/app/actions/booking";
 import { agendarSemLogin } from "@/app/actions/publico";
+import { BotaoVoltar } from "@/components/booking/BotaoVoltar";
 import { Avatar, Button, Field, Input, Modal, Textarea } from "@/components/ui";
 import { urlDoSite } from "@/lib/env";
 import { erroDeTelefone } from "@/lib/telefone";
@@ -107,6 +109,14 @@ export function BookingWizard({
    */
   const [armadilha, setArmadilha] = useState("");
 
+  /**
+   * Logado, nome e celular saem do perfil (a action `agendar` ignora o que a
+   * tela mandar). A tela só pede o que o perfil não tem — a conta do Google
+   * costuma chegar sem celular — e o que for digitado fica salvo nele.
+   */
+  const faltaNome = logado && nomeInicial.trim().length < 2;
+  const faltaTelefone = logado && erroDeTelefone(telefoneInicial) !== null;
+
   /** O erro do telefone, conferido enquanto se digita. */
   const [erroTelefone, setErroTelefone] = useState<string | null>(null);
 
@@ -193,7 +203,7 @@ export function BookingWizard({
     // O telefone é conferido antes de sair do navegador. A regra que VALE está
     // no Postgres e roda de novo lá — esta só evita uma ida e volta à toa.
     const problema = erroDeTelefone(telefone);
-    if (!logado && problema) {
+    if ((!logado || faltaTelefone) && problema) {
       setErroTelefone(problema);
       setErro(problema);
       return;
@@ -287,13 +297,13 @@ export function BookingWizard({
       <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-[560px] items-center gap-2 px-4 py-3">
           {passo === 1 ? (
-            <Link
-              href={`/b/${slug}`}
-              aria-label="Voltar para a barbearia"
-              className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-chip text-ink-soft transition-colors hover:bg-surface-2"
-            >
-              <ArrowLeft className="h-5 w-5" aria-hidden />
-            </Link>
+            // Aberto pelo "Agendar de novo" do app, volta para o app; senão, para a barbearia.
+            <BotaoVoltar
+              destino={`/b/${slug}`}
+              ignorar={`/b/${slug}/agendar`}
+              rotulo="Voltar"
+              className="-ml-2 text-ink-soft transition-colors hover:bg-surface-2"
+            />
           ) : (
             <button
               type="button"
@@ -383,6 +393,9 @@ export function BookingWizard({
             telefone={telefone}
             observacao={observacao}
             logado={logado}
+            perfil={{ nome: nomeInicial.trim(), telefone: mascaraTelefone(telefoneInicial) }}
+            faltaNome={faltaNome}
+            faltaTelefone={faltaTelefone}
             permiteSemCadastro={permiteSemCadastro}
             erroTelefone={erroTelefone}
             armadilha={armadilha}
@@ -780,6 +793,9 @@ function PassoConfirmacao({
   telefone,
   observacao,
   logado,
+  perfil,
+  faltaNome,
+  faltaTelefone,
   permiteSemCadastro,
   erroTelefone,
   armadilha,
@@ -800,6 +816,10 @@ function PassoConfirmacao({
   telefone: string;
   observacao: string;
   logado: boolean;
+  /** Os dados de quem está logado, para o cartão "Agendando como". */
+  perfil: { nome: string; telefone: string };
+  faltaNome: boolean;
+  faltaTelefone: boolean;
   permiteSemCadastro: boolean;
   erroTelefone: string | null;
   armadilha: string;
@@ -860,35 +880,64 @@ function PassoConfirmacao({
               Você pode agendar sem criar conta. A gente te dá um link para acompanhar e
               cancelar — guarde ele.
             </p>
+          ) : (
+            <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brass-soft text-brass-deep">
+                <UserRound className="h-5 w-5" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-ink-faint">Agendando como</p>
+                <p className="truncate text-sm font-semibold text-ink">
+                  {faltaNome ? "Sua conta" : perfil.nome}
+                </p>
+                {!faltaTelefone ? (
+                  <p className="tnum text-sm text-ink-soft">{perfil.telefone}</p>
+                ) : null}
+              </div>
+              <Link
+                href="/app/perfil/dados"
+                className="shrink-0 text-sm font-medium text-brass hover:text-brass-deep"
+              >
+                Alterar
+              </Link>
+            </div>
+          )}
+
+          {!logado || faltaNome ? (
+            <Field label="Seu nome" htmlFor="conf-nome" obrigatorio>
+              <Input
+                id="conf-nome"
+                autoComplete="name"
+                value={nome}
+                onChange={(e) => aoMudarNome(e.target.value)}
+              />
+            </Field>
           ) : null}
 
-          <Field label="Seu nome" htmlFor="conf-nome" obrigatorio>
-            <Input
-              id="conf-nome"
-              autoComplete="name"
-              value={nome}
-              onChange={(e) => aoMudarNome(e.target.value)}
-            />
-          </Field>
-
-          <Field
-            label="Seu celular"
-            htmlFor="conf-telefone"
-            obrigatorio
-            erro={erroTelefone}
-            dica="É por ele que a barbearia te encontra."
-          >
-            <Input
-              id="conf-telefone"
-              inputMode="tel"
-              autoComplete="tel"
-              value={telefone}
-              erro={Boolean(erroTelefone)}
-              onChange={(e) => aoMudarTelefone(e.target.value)}
-              onBlur={aoBorrarTelefone}
-              placeholder="(11) 98765-4321"
-            />
-          </Field>
+          {!logado || faltaTelefone ? (
+            <Field
+              label="Seu celular"
+              htmlFor="conf-telefone"
+              obrigatorio
+              erro={erroTelefone}
+              dica={
+                logado
+                  ? "Fica salvo no seu perfil — não pedimos de novo."
+                  : "É por ele que a barbearia te encontra."
+              }
+            >
+              <Input
+                id="conf-telefone"
+                inputMode="tel"
+                autoComplete="tel"
+                value={telefone}
+                erro={Boolean(erroTelefone)}
+                onChange={(e) => aoMudarTelefone(e.target.value)}
+                onBlur={aoBorrarTelefone}
+                placeholder="(11) 98765-4321"
+              />
+            </Field>
+          ) : null}
 
           <Field label="Observação" htmlFor="conf-obs" dica="Opcional.">
             <Textarea

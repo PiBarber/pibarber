@@ -117,6 +117,57 @@ test.describe("Cliente", () => {
       ]);
   });
 
+  test("logado, a confirmação mostra a conta em vez de pedir nome e celular", async ({ page }) => {
+    const loja = await criarBarbeariaPronta();
+    const cliente = await criarCliente("Carla Perfil Completo");
+    await entrar(page, cliente.email, "cliente");
+
+    await page.goto(`/b/${loja.slug}/agendar`);
+    await escolherHorario(page, "Corte E2E");
+
+    await expect(page.getByText("Agendando como")).toBeVisible();
+    await expect(page.getByText("Carla Perfil Completo")).toBeVisible();
+    await expect(page.locator("#conf-nome")).toHaveCount(0);
+    await expect(page.locator("#conf-telefone")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Confirmar agendamento" }).click();
+    await expect(page.getByRole("heading", { name: "Agendado!" })).toBeVisible();
+
+    // A ficha na barbearia é a do celular do perfil.
+    const [ficha] = sql<{ phone: string; full_name: string }>(`
+      select c.phone, c.full_name from appointments a join customers c on c.id = a.customer_id
+       where a.barbershop_id = '${loja.id}' and c.profile_id = '${cliente.id}'`);
+    expect(ficha).toEqual({ phone: cliente.telefone, full_name: "Carla Perfil Completo" });
+  });
+
+  test("conta sem celular (a do Google) só preenche o celular, e ele fica no perfil", async ({
+    page,
+  }) => {
+    const loja = await criarBarbeariaPronta();
+    const cliente = await criarCliente("Gabi Google");
+    executar(`update profiles set phone = null where id = '${cliente.id}'`);
+    await entrar(page, cliente.email, "cliente");
+
+    await page.goto(`/b/${loja.slug}/agendar`);
+    await escolherHorario(page, "Corte E2E");
+
+    await expect(page.getByText("Gabi Google")).toBeVisible();
+    await expect(page.locator("#conf-nome")).toHaveCount(0);
+    const celular = celularUnico();
+    await page.locator("#conf-telefone").fill(celular);
+    await page.getByRole("button", { name: "Confirmar agendamento" }).click();
+    await expect(page.getByRole("heading", { name: "Agendado!" })).toBeVisible();
+
+    expect(sql(`select phone from profiles where id = '${cliente.id}'`)).toEqual([
+      { phone: celular },
+    ]);
+
+    // Na próxima, já não pede.
+    await page.goto(`/b/${loja.slug}/agendar`);
+    await escolherHorario(page, "Corte E2E");
+    await expect(page.locator("#conf-telefone")).toHaveCount(0);
+  });
+
   test("cancela pelo app e o horário volta a ficar livre", async ({ page }) => {
     const loja = await criarBarbeariaPronta();
     const cliente = await criarCliente();

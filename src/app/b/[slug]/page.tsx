@@ -1,15 +1,18 @@
 import { MapPin, MessageCircle, Phone, Star } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { registrarVisita } from "@/app/actions/booking";
 import { AbasPerfil, type AbaDoPerfil } from "@/components/booking/AbasPerfil";
 import { BotaoFavoritoPublico } from "@/components/booking/BotaoFavoritoPublico";
+import { BotaoVoltar } from "@/components/booking/BotaoVoltar";
 import { Avatar, Chip, Rating } from "@/components/ui";
 import { getProfile } from "@/lib/auth";
 import { iconeDoBeneficio } from "@/lib/beneficios";
+import { casaDoLado, COOKIE_LADO, ladoDaSessao } from "@/lib/lado";
 import {
   carregarBarbeariaPorSlug,
   estaAbertaAgora,
@@ -86,6 +89,20 @@ export default async function PerfilBarbeariaPage({
 
   const perfil = await getProfile();
   const favoritada = perfil ? await jaEFavorita(perfil.id, loja.id) : false;
+
+  // O "voltar" só existe para quem tem conta: o visitante que chegou pelo link
+  // do Instagram não tem um app para onde voltar. Sem histórico do app, a seta
+  // leva à casa do lado em que a pessoa está (o dono vendo a própria página
+  // volta ao painel).
+  let destinoVoltar: string | null = null;
+  if (perfil) {
+    const temBarbearia = perfil.role === "owner" || perfil.role === "assistant";
+    const lado = ladoDaSessao((await cookies()).get(COOKIE_LADO)?.value, {
+      temBarbearia,
+      ehAdmin: perfil.is_platform_admin,
+    });
+    destinoVoltar = casaDoLado(lado, temBarbearia);
+  }
 
   const aberta = estaAbertaAgora(horarios);
   const hoje = indiceDoDia();
@@ -172,6 +189,17 @@ export default async function PerfilBarbeariaPage({
               sizes="(max-width: 560px) 100vw, 560px"
               className="object-cover"
             />
+          ) : null}
+
+          {destinoVoltar ? (
+            <div className="absolute left-3 top-3">
+              <BotaoVoltar
+                destino={destinoVoltar}
+                ignorar={`/b/${loja.slug}`}
+                rotulo="Voltar"
+                className="bg-surface/90 text-ink-soft shadow-card backdrop-blur transition-transform active:scale-90"
+              />
+            </div>
           ) : null}
 
           <div className="absolute right-3 top-3">

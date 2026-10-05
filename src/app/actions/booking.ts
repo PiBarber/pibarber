@@ -8,6 +8,7 @@ import { traduzirErroBanco, traduzirErroDesconhecido } from "@/lib/erros";
 import { tagBarbearia } from "@/lib/queries/barbearia";
 import { createClient } from "@/lib/supabase/server";
 import { falha, sucesso, type ActionResult, type BarbeariaEncontrada } from "@/lib/types";
+import { erroDeTelefone, normalizarTelefone } from "@/lib/telefone";
 import { timestampSP } from "@/lib/utils";
 import { avisarPorEmail } from "@/lib/email/avisos";
 import { avisarPorWhatsapp } from "@/lib/whatsapp/avisos";
@@ -188,12 +189,25 @@ export async function agendar(entrada: {
     if (!entrada.professionalId) return falha("Escolha o profissional.");
     if (!entrada.dia || !entrada.hora) return falha("Escolha o dia e o horário.");
 
-    const nome = entrada.nome?.trim() || perfil?.full_name || "";
-    const telefone = (entrada.telefone || perfil?.phone || "").replace(/\D/g, "");
+    // Logado, quem agenda é o PERFIL: nome e celular saem dele, não da tela.
+    // O celular é o que o banco usa para achar a ficha do cliente na
+    // barbearia — aceitar outro digitado aqui mandaria o agendamento para a
+    // ficha errada (ou criaria uma segunda). A tela só pede o que o perfil
+    // ainda não tem (conta do Google sem celular), e o que vier é salvo nele.
+    const nomePerfil = perfil?.full_name?.trim() ?? "";
+    const telefonePerfil = normalizarTelefone(perfil?.phone);
+    const perfilTemTelefone = perfil != null && erroDeTelefone(telefonePerfil) === null;
+
+    const nome = nomePerfil || entrada.nome?.trim() || "";
+    const telefone = perfilTemTelefone ? telefonePerfil : normalizarTelefone(entrada.telefone);
 
     if (!perfil) {
       if (nome.length < 2) return falha("Informe seu nome.");
       if (telefone.length < 10) return falha("Informe seu celular com DDD.");
+    } else {
+      if (nome.length < 2) return falha("Informe seu nome.", "nome");
+      const erroTelefone = perfilTemTelefone ? null : erroDeTelefone(telefone);
+      if (erroTelefone) return falha(erroTelefone, "telefone");
     }
 
     const supabase = await createClient();
@@ -213,6 +227,16 @@ export async function agendar(entrada: {
 
     if (error) return falha(traduzirErroBanco(error, "[agendar] book_appointment"));
     if (!data) return falha("Não consegui concluir o agendamento.");
+
+    // Completa o perfil com o que a tela pediu, para não pedir de novo. Pelo
+    // cliente com sessão: nome e celular estão no grant por coluna do 03.
+    if (perfil && (!nomePerfil || !perfilTemTelefone)) {
+      const { error: erroPerfil } = await supabase
+        .from("profiles")
+        .update({ full_name: nome, phone: telefone })
+        .eq("id", perfil.id);
+      if (erroPerfil) console.error("[agendar] falha ao completar o perfil:", erroPerfil);
+    }
 
     // Efeito colateral, não parte do agendamento: `avisarPorEmail` só loga e
     // NUNCA lança. Sem confirmação por WhatsApp — ela saiu em 2026-09-30; no
