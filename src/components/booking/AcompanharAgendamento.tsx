@@ -176,7 +176,7 @@ export function AcompanharAgendamento({
       <div className="rounded-card bg-surface-2 px-4 py-3 text-center">
         <p className="text-sm text-ink-soft">
           Quer parar de depender deste link?{" "}
-          <Link href="/criar-conta" className="font-semibold text-brass hover:text-brass-deep">
+          <Link href="/criar-conta-cliente" className="font-semibold text-brass hover:text-brass-deep">
             Crie sua conta
           </Link>{" "}
           — leva menos de um minuto.

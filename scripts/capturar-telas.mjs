@@ -220,10 +220,10 @@ class Aba {
  */
 async function entrar(aba, email) {
   await aba.chamar("Network.clearBrowserCookies");
-  await aba.irPara("/entrar");
+  await aba.irPara("/entrar-cliente");
 
   const achou = await aba.avaliar(`!!document.querySelector('input[name="email"]')`);
-  if (!achou) throw new Error("o formulário de login não apareceu em /entrar");
+  if (!achou) throw new Error("o formulário de login não apareceu em /entrar-cliente");
 
   // Os dois campos são inputs não controlados (FormEntrar usa useActionState com
   // <form action>), então atribuir .value direto basta — não é preciso mexer no

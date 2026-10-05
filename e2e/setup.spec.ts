@@ -28,7 +28,7 @@ test("dono se cadastra, passa pelo setup e a barbearia vai ao ar", async ({ page
     .getByRole("link", { name: /criar conta/i })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/criar-conta\?tipo=barbearia/);
+  await expect(page).toHaveURL(/\/cadastrar-barbearia/);
 
   await page.locator("#nomeBarbearia").fill(nomeLoja);
   await page.locator("#nome").fill("Rafael Dono Teste");
@@ -36,6 +36,7 @@ test("dono se cadastra, passa pelo setup e a barbearia vai ao ar", async ({ page
   await page.locator("#email").fill(email);
   await page.locator("#senha").fill(SENHA);
   await page.locator("#confirmacao").fill(SENHA);
+  await page.locator("#termos").check();
   await page.getByRole("button", { name: /criar/i }).click();
 
   await expect(page).toHaveURL(/\/configurar/, { timeout: 30_000 });
@@ -132,13 +133,14 @@ test("o mesmo celular não cadastra duas barbearias", async ({ page }) => {
     [2, null],
   ] as const) {
     await page.context().clearCookies();
-    await page.goto("/criar-conta?tipo=barbearia");
+    await page.goto("/cadastrar-barbearia");
     await page.locator("#nomeBarbearia").fill(`Barbearia ${unico(`dup${i}`)}`);
     await page.locator("#nome").fill("Dono Duplicado");
     await page.locator("#telefone").fill(celular);
     await page.locator("#email").fill(`${unico("dup")}@example.com`);
     await page.locator("#senha").fill(SENHA);
     await page.locator("#confirmacao").fill(SENHA);
+    await page.locator("#termos").check();
     await page.getByRole("button", { name: /criar/i }).click();
 
     if (esperado) {
@@ -147,7 +149,7 @@ test("o mesmo celular não cadastra duas barbearias", async ({ page }) => {
       await expect(
         page.getByText("Este telefone já está cadastrado em outra barbearia."),
       ).toBeVisible();
-      await expect(page).toHaveURL(/\/criar-conta/);
+      await expect(page).toHaveURL(/\/cadastrar-barbearia/);
     }
   }
 });

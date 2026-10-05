@@ -5,7 +5,16 @@ import { cookies } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 
 import { ROTA_EMAIL_CONFIRMADO, ROTA_REDEFINIR_SENHA } from "@/lib/auth";
-import { casaDoLado, COOKIE_LADO, OPCOES_COOKIE_LADO, type Lado } from "@/lib/lado";
+import {
+  casaDoLado,
+  COOKIE_LADO,
+  ladoDaSessao,
+  OPCOES_COOKIE_LADO,
+  portaDe,
+  rotaDeEntrar,
+  rotaDeEntrarCom,
+  type Porta,
+} from "@/lib/lado";
 import { urlDoSite } from "@/lib/env";
 import { criarBarbeariaDoDono, telefoneDeOutroDono } from "@/lib/nova-barbearia";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -96,8 +105,8 @@ export async function entrar(entrada: {
   email: string;
   senha: string;
   proximo?: string;
-  /** A porta: "barbearia" (/entrar?tipo=barbearia) ou "cliente" (/entrar). */
-  lado?: Lado;
+  /** A porta: "barbearia" (/entrar-barbeiro) ou "cliente" (/entrar-cliente). */
+  lado?: Porta;
 }): Promise<ActionResult> {
   const email = entrada.email.trim().toLowerCase();
   const senha = entrada.senha;
@@ -123,28 +132,94 @@ export async function entrar(entrada: {
     // Onde cada papel mora. Lido aqui porque a sessão acabou de nascer.
     const { data: perfil, error: erroPerfil } = await supabase
       .from("profiles")
-      .select("role, is_platform_admin")
+      .select("role")
       .eq("id", data.user.id)
       .maybeSingle();
 
     if (erroPerfil) console.error("[auth] falha ao ler o perfil no login:", erroPerfil);
 
-    if (perfil?.is_platform_admin) {
-      revalidatePath("/", "layout");
-      redirect(proximo ?? "/admin");
-    }
-
     // A porta decide o lado da sessão (src/lib/lado.ts). Conta só de cliente
     // pela porta da barbearia vira "cliente" e é convidada a criar a loja.
+    // O admin, por aqui, é uma conta comum: o /admin só abre por /admin/entrar.
+    const porta = portaDe(entrada.lado);
     const temBarbearia = perfil?.role === "owner" || perfil?.role === "assistant";
-    const lado: Lado = entrada.lado === "barbearia" && temBarbearia ? "barbearia" : "cliente";
+    const lado: Porta = porta === "barbearia" && temBarbearia ? "barbearia" : "cliente";
     (await cookies()).set(COOKIE_LADO, lado, OPCOES_COOKIE_LADO);
 
     revalidatePath("/", "layout");
-    redirect(proximo ?? casaDoLado(entrada.lado ?? "cliente", temBarbearia));
+    redirect(proximo ?? casaDoLado(porta, temBarbearia));
   } catch (error) {
     unstable_rethrow(error); // deixa o redirect() acima passar
     console.error("[auth] erro inesperado em entrar:", error);
+    return falha("Não consegui entrar. Tente de novo em instantes.");
+  }
+}
+
+/* ==========================================================================
+   Entrar no admin — a porta da plataforma
+   ========================================================================== */
+
+/** A mesma frase para senha errada e para conta que não é admin. */
+const RECUSA_ADMIN = "E-mail ou senha incorretos.";
+
+/**
+ * Só e-mail e senha: sem Google, sem cadastro, sem dica.
+ *
+ * Quem acerta a senha mas NÃO é admin ouve exatamente o mesmo que quem errou,
+ * e a sessão que acabou de nascer é desfeita na hora. A tela não serve para
+ * descobrir quais contas existem nem quais são admin.
+ */
+export async function entrarAdmin(entrada: {
+  email: string;
+  senha: string;
+  proximo?: string;
+}): Promise<ActionResult> {
+  const email = entrada.email.trim().toLowerCase();
+  const senha = entrada.senha;
+  const proximoBruto = destinoSeguro(entrada.proximo);
+  // De volta só para dentro do /admin — esta porta não leva a outro lugar.
+  const proximo =
+    proximoBruto && (proximoBruto === "/admin" || proximoBruto.startsWith("/admin/"))
+      ? proximoBruto
+      : null;
+
+  if (!email) return falha("Informe o e-mail.", "email");
+  if (!senha) return falha("Informe a senha.", "senha");
+
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+
+    if (error) {
+      const { texto, campo } = traduzirErroAuth(error.message);
+      // Credencial recusada: a frase neutra, sem a dica do Google das outras portas.
+      if (campo === "senha") return falha(RECUSA_ADMIN, "senha");
+      return falha(texto, campo);
+    }
+    if (!data.user) return falha("Não consegui entrar. Tente de novo.");
+
+    const { data: perfil, error: erroPerfil } = await supabase
+      .from("profiles")
+      .select("is_platform_admin")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (erroPerfil) console.error("[auth] falha ao ler o perfil no login do admin:", erroPerfil);
+
+    if (!perfil?.is_platform_admin) {
+      const { error: erroSair } = await supabase.auth.signOut();
+      if (erroSair) console.error("[auth] falha ao desfazer a sessão recusada:", erroSair);
+      return falha(RECUSA_ADMIN, "senha");
+    }
+
+    (await cookies()).set(COOKIE_LADO, "admin", OPCOES_COOKIE_LADO);
+
+    revalidatePath("/", "layout");
+    redirect(proximo ?? "/admin");
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[auth] erro inesperado em entrarAdmin:", error);
     return falha("Não consegui entrar. Tente de novo em instantes.");
   }
 }
@@ -325,17 +400,17 @@ export async function criarContaBarbearia(entrada: {
     if (error) {
       const { texto, campo } = traduzirErroAuth(error.message);
       if (campo === "email" && texto.startsWith("Já existe")) {
-        return falha(MENSAGEM_EMAIL_DE_CLIENTE, "email");
+        return falha(MENSAGEM_EMAIL_EXISTENTE, CAMPO_CONTA_EXISTENTE);
       }
       return falha(texto, campo);
     }
 
     // Mesmo disfarce do `criarConta`: e-mail já cadastrado volta como usuário
     // de mentira, sem identidades. O caso típico aqui é o CLIENTE do app que
-    // quer abrir a barbearia dele — e para ele existe caminho próprio, sem
-    // perder a conta: `abrirMinhaBarbearia`, pelo Perfil.
+    // quer abrir a barbearia dele — e a tela oferece isso ali mesmo: pede a
+    // senha e chama `vincularBarbearia`, sem ele perder a conta.
     if (!data.user || (data.user.identities?.length ?? 0) === 0) {
-      return falha(MENSAGEM_EMAIL_DE_CLIENTE, "email");
+      return falha(MENSAGEM_EMAIL_EXISTENTE, CAMPO_CONTA_EXISTENTE);
     }
 
     const userId = data.user.id;
@@ -369,11 +444,130 @@ export async function criarContaBarbearia(entrada: {
 }
 
 /**
- * Não diz "é conta de cliente" — o Supabase não revela de quem é o e-mail, e
- * esta tela também não deveria. Diz o que fazer nos dois casos possíveis.
+ * Não diz "é conta de cliente" nem mostra nome ou foto — o Supabase não revela
+ * de quem é o e-mail, e esta tela também não deveria. Quem é dono da conta
+ * prova com a senha (ou com o Google) e só então a barbearia é vinculada.
  */
-const MENSAGEM_EMAIL_DE_CLIENTE =
-  "Já existe uma conta com este e-mail. Se ela é sua, entre pela área da barbearia para criar a sua.";
+const MENSAGEM_EMAIL_EXISTENTE =
+  "Já existe uma conta com este e-mail. Se ela é sua, confirme a senha para vincular a barbearia.";
+
+/**
+ * O `campo` que avisa a tela de cadastro para abrir o cartão de vínculo em vez
+ * de só acender o campo do e-mail. Não é um campo do formulário.
+ */
+const CAMPO_CONTA_EXISTENTE = "contaExistente";
+
+/* ==========================================================================
+   Vincular a barbearia a uma conta que já existe
+   ========================================================================== */
+
+/**
+ * O cliente que chega ao /cadastrar-barbearia com o e-mail da conta dele.
+ *
+ * Primeiro prova que a conta é dele (a senha), depois faz o mesmo que
+ * `abrirMinhaBarbearia` faz pelo Perfil: a loja nasce com `owner_id` nele e o
+ * trigger o promove a `owner`. Os agendamentos de cliente continuam onde estão.
+ *
+ * Senha errada não deixa nada para trás — nenhuma sessão nasceu. Conta que JÁ
+ * tem barbearia (dono ou assistente) simplesmente entra pelo lado da
+ * barbearia: era isso que ela queria ao digitar a senha.
+ */
+export async function vincularBarbearia(entrada: {
+  email: string;
+  senha: string;
+  nomeBarbearia: string;
+  telefone: string;
+}): Promise<ActionResult> {
+  const email = entrada.email.trim().toLowerCase();
+  const nomeBarbearia = entrada.nomeBarbearia.trim();
+  const telefone = normalizarTelefone(entrada.telefone);
+
+  if (!emailValido(email)) return falha("Esse e-mail não parece válido.", "email");
+  if (!entrada.senha) return falha("Digite sua senha para confirmar.", "senhaVinculo");
+  if (nomeBarbearia.length < 2) return falha("Escreva o nome da barbearia.", "nomeBarbearia");
+  const erroTelefone = erroDeTelefone(telefone);
+  if (erroTelefone) return falha(erroTelefone, "telefone");
+
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: entrada.senha,
+    });
+
+    if (error) {
+      const { texto, campo } = traduzirErroAuth(error.message);
+      if (campo === "senha") {
+        return falha(
+          "Senha incorreta. Tente de novo, recupere a senha ou entre com o Google.",
+          "senhaVinculo",
+        );
+      }
+      return falha(texto, campo === "email" ? "email" : undefined);
+    }
+    if (!data.user) return falha("Não consegui confirmar a conta. Tente de novo.");
+
+    const { data: perfil, error: erroPerfil } = await supabase
+      .from("profiles")
+      .select("role, phone")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (erroPerfil || !perfil) {
+      console.error("[auth] falha ao ler o perfil no vínculo:", erroPerfil);
+      return falha("Não consegui vincular a barbearia. Tente de novo em instantes.");
+    }
+
+    const cookieStore = await cookies();
+
+    // Já tem barbearia: não cria outra, só entra do lado dela.
+    if (perfil.role !== "client") {
+      cookieStore.set(COOKIE_LADO, "barbearia", OPCOES_COOKIE_LADO);
+      revalidatePath("/", "layout");
+      redirect("/painel");
+    }
+
+    // A partir daqui a conta está provada — ver src/lib/supabase/admin.ts.
+    const admin = createAdminClient();
+
+    const telefoneEmUso = await telefoneDeOutroDono(admin, telefone);
+    if (telefoneEmUso === null) {
+      return falha("Não consegui vincular a barbearia. Tente de novo em instantes.");
+    }
+    if (telefoneEmUso) {
+      return falha("Este telefone já está cadastrado em outra barbearia.", "telefone");
+    }
+
+    const criada = await criarBarbeariaDoDono(admin, {
+      userId: data.user.id,
+      nomeBarbearia,
+      telefone,
+    });
+
+    if (!criada.ok) {
+      // Mesmo desfazer do `abrirMinhaBarbearia`: o telefone do perfil volta a
+      // ser o do cliente, que é onde as barbearias dele o procuram.
+      const { error: erroDesfazer } = await admin
+        .from("profiles")
+        .update({ phone: perfil.phone })
+        .eq("id", data.user.id);
+      if (erroDesfazer) console.error("[auth] falha ao desfazer o telefone:", erroDesfazer);
+
+      return criada.motivo === "telefone_em_uso"
+        ? falha("Este telefone já está cadastrado em outra barbearia.", "telefone")
+        : falha("Não consegui criar a barbearia. Tente de novo em instantes.");
+    }
+
+    cookieStore.set(COOKIE_LADO, "barbearia", OPCOES_COOKIE_LADO);
+    revalidatePath("/", "layout");
+    redirect("/configurar");
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[auth] erro inesperado em vincularBarbearia:", error);
+    return falha("Não consegui vincular a barbearia. Tente de novo em instantes.");
+  }
+}
 
 /* ==========================================================================
    Google
@@ -386,7 +580,7 @@ const MENSAGEM_EMAIL_DE_CLIENTE =
  */
 export async function entrarComGoogle(formData: FormData): Promise<void> {
   const proximo = destinoSeguro(formData.get("proximo"));
-  const lado = formData.get("lado") === "barbearia" ? "barbearia" : "cliente";
+  const lado = portaDe(formData.get("lado"));
   let destino: string;
 
   try {
@@ -401,16 +595,16 @@ export async function entrarComGoogle(formData: FormData): Promise<void> {
 
     if (error || !data.url) {
       console.error("[auth] falha ao abrir o OAuth do Google:", error);
-      destino = `/entrar?erro=${encodeURIComponent(
-        error ? traduzirErroAuth(error.message).texto : "Não consegui abrir o login do Google.",
-      )}`;
+      destino = rotaDeEntrarCom(lado, {
+        erro: error ? traduzirErroAuth(error.message).texto : "Não consegui abrir o login do Google.",
+      });
     } else {
       destino = data.url;
     }
   } catch (error) {
     unstable_rethrow(error);
     console.error("[auth] erro inesperado em entrarComGoogle:", error);
-    destino = `/entrar?erro=${encodeURIComponent("Não consegui abrir o login do Google.")}`;
+    destino = rotaDeEntrarCom(lado, { erro: "Não consegui abrir o login do Google." });
   }
 
   // redirect() fora do try: ele funciona levantando exceção, e um catch
@@ -436,13 +630,13 @@ export async function entrarComGoogle(formData: FormData): Promise<void> {
  */
 export async function pedirNovaSenha(entrada: {
   email: string;
-  lado?: Lado;
+  lado?: Porta;
 }): Promise<ActionResult> {
   try {
     const email = entrada.email.trim().toLowerCase();
     if (!emailValido(email)) return falha("Digite um e-mail válido.", "email");
 
-    const lado: Lado = entrada.lado === "barbearia" ? "barbearia" : "cliente";
+    const lado = portaDe(entrada.lado);
     const supabase = await createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${urlDoSite()}/callback?lado=${lado}&proximo=${encodeURIComponent(ROTA_REDEFINIR_SENHA)}`,
@@ -505,11 +699,13 @@ export async function redefinirSenha(entrada: {
       .eq("id", user.id)
       .maybeSingle();
     const temBarbearia = perfil?.role === "owner" || perfil?.role === "assistant";
-    const lado =
-      (await cookies()).get(COOKIE_LADO)?.value === "barbearia" ? "barbearia" : "cliente";
+    const lado = ladoDaSessao((await cookies()).get(COOKIE_LADO)?.value, {
+      temBarbearia,
+      ehAdmin: perfil?.is_platform_admin ?? false,
+    });
 
     revalidatePath("/", "layout");
-    redirect(perfil?.is_platform_admin ? "/admin" : casaDoLado(lado, temBarbearia));
+    redirect(casaDoLado(lado, temBarbearia));
   } catch (error) {
     unstable_rethrow(error);
     console.error("[auth] erro inesperado em redefinirSenha:", error);
@@ -518,8 +714,12 @@ export async function redefinirSenha(entrada: {
 }
 
 export async function sair(): Promise<void> {
-  // O lado da sessão sai junto: a próxima porta escolhe de novo.
-  (await cookies()).delete(COOKIE_LADO);
+  // O lado da sessão sai junto: a próxima porta escolhe de novo. Antes, ele
+  // diz para qual porta voltar — quem saiu do painel quer o login do painel.
+  const cookieStore = await cookies();
+  const valorLado = cookieStore.get(COOKIE_LADO)?.value;
+  const porta = valorLado === "admin" ? "admin" : portaDe(valorLado);
+  cookieStore.delete(COOKIE_LADO);
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
@@ -530,5 +730,5 @@ export async function sair(): Promise<void> {
   }
 
   revalidatePath("/", "layout");
-  redirect("/entrar");
+  redirect(rotaDeEntrar(porta));
 }

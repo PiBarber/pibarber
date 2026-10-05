@@ -72,7 +72,7 @@ const GRUPOS = {
     // A landing é vista dos dois; o perfil da barbearia chega quase sempre pelo
     // link do Instagram, ou seja, num celular.
     aparelho: CELULAR,
-    rotas: ["/", "/entrar", "/b/barbearia-do-tiao", "/b/barbearia-do-tiao/agendar"],
+    rotas: ["/", "/entrar-cliente", "/b/barbearia-do-tiao", "/b/barbearia-do-tiao/agendar"],
   },
   painel: {
     conta: "dono.campinas@pibarber.dev",
@@ -370,10 +370,10 @@ async function entrar(aba, email) {
   // O Chrome guarda a sessão entre execuções: sem limpar, trocar de conta cai
   // no painel da anterior e o formulário nem existe (armadilha nº13).
   await aba.chamar("Network.clearBrowserCookies");
-  await aba.irPara("/entrar");
+  await aba.irPara("/entrar-cliente");
 
   const achou = await aba.avaliar(`!!document.querySelector('input[name="email"]')`);
-  if (!achou) throw new Error("o formulário de login não apareceu em /entrar");
+  if (!achou) throw new Error("o formulário de login não apareceu em /entrar-cliente");
 
   await aba.avaliar(`
     (() => {

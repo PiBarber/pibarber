@@ -7,6 +7,7 @@ import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ShopContext, SubscriptionStatus, UserRole } from "@/lib/types";
+import { COOKIE_LADO, ROTA_ENTRAR_ADMIN, ROTA_ENTRAR_CLIENTE } from "@/lib/lado";
 import { COOKIE_VISUALIZACAO, lojaDoCookie, ModoSomenteLeitura } from "@/lib/visualizacao";
 
 /**
@@ -65,7 +66,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
 /** Exige alguém logado. Sem sessão, manda para o login. */
 export async function requireProfile(): Promise<Profile> {
   const perfil = await getProfile();
-  if (!perfil) redirect("/entrar");
+  if (!perfil) redirect(ROTA_ENTRAR_CLIENTE);
   return perfil;
 }
 
@@ -80,10 +81,15 @@ export async function requireRole(papeis: UserRole[]): Promise<Profile> {
   return perfil;
 }
 
-/** Exige a permissão extra de admin da plataforma. */
+/**
+ * Exige a permissão extra de admin da plataforma E que a sessão tenha entrado
+ * pela porta do admin (/admin/entrar). Admin logado por outra porta é uma
+ * conta comum e volta para o login do admin (src/lib/lado.ts).
+ */
 export async function requireAdmin(): Promise<Profile> {
   const perfil = await requireProfile();
   if (!perfil.is_platform_admin) redirect(rotaInicial(perfil));
+  if ((await cookies()).get(COOKIE_LADO)?.value !== "admin") redirect(ROTA_ENTRAR_ADMIN);
   return perfil;
 }
 
@@ -119,8 +125,11 @@ export const requireShopContext = cache(async (): Promise<ShopContext> => {
 async function contextoDeVisualizacao(): Promise<ShopContext | null> {
   const perfil = await getProfile();
   if (!perfil?.is_platform_admin) return null;
+  // Só do lado admin: o admin logado por outra porta é uma conta comum.
+  const cookieStore = await cookies();
+  if (cookieStore.get(COOKIE_LADO)?.value !== "admin") return null;
 
-  const shopId = lojaDoCookie((await cookies()).get(COOKIE_VISUALIZACAO)?.value);
+  const shopId = lojaDoCookie(cookieStore.get(COOKIE_VISUALIZACAO)?.value);
   if (!shopId) return null;
 
   const supabase = await createClient();
@@ -261,7 +270,7 @@ async function contextoDoPainel(): Promise<ShopContext> {
   } catch (error) {
     unstable_rethrow(error);
     console.error("[auth] erro inesperado em requireShopContext:", error);
-    redirect("/entrar");
+    redirect(ROTA_ENTRAR_CLIENTE);
   }
 }
 
@@ -289,9 +298,12 @@ export const ROTA_EMAIL_CONFIRMADO = "/email-confirmado";
 /** Para onde o link do e-mail de "Esqueci minha senha" leva, já com sessão. */
 export const ROTA_REDEFINIR_SENHA = "/redefinir-senha";
 
-/** A casa de cada papel, usada depois do login e em todo redirect de acesso. */
-export function rotaInicial(perfil: Pick<Profile, "role" | "is_platform_admin">): string {
-  if (perfil.is_platform_admin) return "/admin";
+/**
+ * A casa de cada papel, usada em todo redirect de acesso. O admin não tem casa
+ * aqui: o /admin só abre pela porta dele (src/lib/lado.ts), então a conta dele
+ * vale como a de qualquer cliente ou barbeiro.
+ */
+export function rotaInicial(perfil: Pick<Profile, "role">): string {
   if (perfil.role === "owner" || perfil.role === "assistant") return "/painel";
   return "/app";
 }

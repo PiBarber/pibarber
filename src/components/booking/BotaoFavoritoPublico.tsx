@@ -34,7 +34,7 @@ export function BotaoFavoritoPublico({
       aria-label={favorita ? "Remover dos favoritos" : "Adicionar aos favoritos"}
       onClick={() => {
         if (!logado) {
-          router.push("/entrar?proximo=/app/perfil/favoritos");
+          router.push("/entrar-cliente?proximo=/app/perfil/favoritos");
           return;
         }
 

@@ -166,10 +166,10 @@ export async function criarBarbeariaPronta(nome = "Barbearia E2E"): Promise<Loja
  * "Entrar" da landing; "cliente" é o "Sou cliente".
  */
 export async function entrar(page: Page, email: string, porta: "barbearia" | "cliente") {
-  await page.goto(porta === "barbearia" ? "/entrar?tipo=barbearia" : "/entrar");
+  await page.goto(porta === "barbearia" ? "/entrar-barbeiro" : "/entrar-cliente");
   await page.locator("#email").fill(email);
   await page.locator("#senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page.getByRole("button", { name: /^Entrar( no painel)?$/ }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/entrar"));
 }
 

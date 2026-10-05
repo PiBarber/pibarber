@@ -271,13 +271,13 @@ export default async function LandingPage() {
             </span>
             {/* "Entrar" da landing é a porta da BARBEARIA (src/lib/lado.ts); o
                 cliente entra pelo "Sou cliente". */}
-            <LinkButton href="/entrar?tipo=barbearia" variante="ghost" tamanho="sm">
+            <LinkButton href="/entrar-barbeiro" variante="ghost" tamanho="sm">
               Entrar
             </LinkButton>
             {/* Da landing, "Criar conta" é SEMPRE de barbearia: a landing vende
                 o sistema para o dono. O cliente cria a conta dele pelo fluxo
                 de agendamento, que leva para /criar-conta sem o `?tipo=`. */}
-            <LinkButton href="/criar-conta?tipo=barbearia" variante="primary" tamanho="sm">
+            <LinkButton href="/cadastrar-barbearia" variante="primary" tamanho="sm">
               Criar conta
             </LinkButton>
           </div>
@@ -325,7 +325,7 @@ export default async function LandingPage() {
                   linhas sem estourar a caixa. */}
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <LinkButton
-                  href="/criar-conta?tipo=barbearia"
+                  href="/cadastrar-barbearia"
                   tamanho="lg"
                   larguraTotal
                   className="sm:w-auto"
@@ -344,7 +344,7 @@ export default async function LandingPage() {
                   Ver como funciona
                 </LinkButton>
                 <LinkButton
-                  href="/entrar"
+                  href="/entrar-cliente"
                   variante="outline"
                   tamanho="lg"
                   larguraTotal
@@ -596,7 +596,7 @@ export default async function LandingPage() {
               </p>
 
               <LinkButton
-                href="/criar-conta?tipo=barbearia"
+                href="/cadastrar-barbearia"
                 tamanho="lg"
                 larguraTotal
                 className="mt-6"

@@ -31,7 +31,7 @@ test.describe("Login pelas duas portas", () => {
   });
 
   test("senha errada mostra o erro e não entra", async ({ page }) => {
-    await page.goto("/entrar");
+    await page.goto("/entrar-cliente");
     await page.locator("#email").fill("cliente1@pibarber.dev");
     await page.locator("#senha").fill("senha-errada");
     await page.getByRole("button", { name: "Entrar", exact: true }).click();
@@ -41,7 +41,45 @@ test.describe("Login pelas duas portas", () => {
 
   test("sem login, o painel manda para a porta da barbearia", async ({ page }) => {
     await page.goto("/painel/agenda");
-    await expect(page).toHaveURL(/\/entrar\?.*tipo=barbearia/);
+    await expect(page).toHaveURL(/\/entrar-barbeiro\?proximo=/);
+  });
+
+  test("sem login, o app manda para a porta do cliente", async ({ page }) => {
+    await page.goto("/app/agendamentos");
+    await expect(page).toHaveURL(/\/entrar-cliente\?proximo=/);
+  });
+
+  test("os endereços antigos levam às portas novas", async ({ page }) => {
+    await page.goto("/entrar?tipo=barbearia");
+    await expect(page).toHaveURL(/\/entrar-barbeiro/);
+    await page.goto("/entrar");
+    await expect(page).toHaveURL(/\/entrar-cliente/);
+    await page.goto("/criar-conta?tipo=barbearia");
+    await expect(page).toHaveURL(/\/cadastrar-barbearia/);
+    await page.goto("/criar-conta");
+    await expect(page).toHaveURL(/\/criar-conta-cliente/);
+  });
+});
+
+test.describe("Porta do admin", () => {
+  test("sem login, o /admin manda para o login do admin", async ({ page }) => {
+    await page.goto("/admin/barbearias");
+    await expect(page).toHaveURL(/\/admin\/entrar\?proximo=/);
+  });
+
+  test("conta que não é admin, com a senha certa, ouve o mesmo que senha errada", async ({
+    page,
+  }) => {
+    await page.goto("/admin/entrar");
+    await page.locator("#email").fill("dono.saopaulo@pibarber.dev");
+    await page.locator("#senha").fill(SENHA);
+    await page.getByRole("button", { name: "Entrar", exact: true }).click();
+    await expect(page.getByText("E-mail ou senha incorretos.")).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/entrar/);
+
+    // E a sessão foi desfeita: o painel do dono pede login de novo.
+    await page.goto("/painel");
+    await expect(page).toHaveURL(/\/entrar-barbeiro/);
   });
 });
 
@@ -52,7 +90,7 @@ test.describe("Esqueci minha senha", () => {
   }) => {
     const cliente = await criarCliente("Ana Esquecida");
 
-    await page.goto("/entrar");
+    await page.goto("/entrar-cliente");
     await page.getByRole("link", { name: "Esqueci minha senha" }).click();
     await expect(page).toHaveURL(/\/esqueci-senha/);
 
@@ -79,7 +117,7 @@ test.describe("Esqueci minha senha", () => {
 
     // A senha nova vale num login novo, do zero.
     await page.context().clearCookies();
-    await page.goto("/entrar");
+    await page.goto("/entrar-cliente");
     await page.locator("#email").fill(cliente.email);
     await page.locator("#senha").fill(novaSenha);
     await page.getByRole("button", { name: "Entrar", exact: true }).click();

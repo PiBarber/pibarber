@@ -111,7 +111,9 @@ saber quanto pagar. Se o profissional precisar de acesso, ele vira um `assistant
 
 ```
 /                        landing (vende o PiBarber para o dono de barbearia)
-/entrar  /criar-conta    autenticação (e-mail/senha + Google)
+/entrar-cliente  /criar-conta-cliente     porta do cliente (e-mail/senha + Google)
+/entrar-barbeiro /cadastrar-barbearia     porta do barbeiro (dono e assistente)
+/admin/entrar                            porta do admin (só e-mail e senha)
 
 APP DO CLIENTE — 4 abas fixas na base
 /app                     Início

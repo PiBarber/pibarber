@@ -2,7 +2,14 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ROTA_EMAIL_CONFIRMADO, ROTA_REDEFINIR_SENHA } from "@/lib/auth";
-import { casaDoLado, COOKIE_LADO, OPCOES_COOKIE_LADO, type Lado } from "@/lib/lado";
+import {
+  casaDoLado,
+  COOKIE_LADO,
+  OPCOES_COOKIE_LADO,
+  portaDe,
+  rotaDeEntrarCom,
+  type Porta,
+} from "@/lib/lado";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -20,9 +27,9 @@ import { createClient } from "@/lib/supabase/server";
  *   Supabase  → Authentication → URL Configuration → Redirect URLs
  *   Google    → Credenciais OAuth → URIs de redirecionamento autorizados
  */
-/** Manda de volta para o login com a mensagem já em português. */
-function recusar(origin: string, mensagem: string): NextResponse {
-  return NextResponse.redirect(`${origin}/entrar?erro=${encodeURIComponent(mensagem)}`);
+/** Manda de volta para o login DA PORTA de onde veio, com a mensagem em português. */
+function recusar(origin: string, porta: Porta, mensagem: string): NextResponse {
+  return NextResponse.redirect(`${origin}${rotaDeEntrarCom(porta, { erro: mensagem })}`);
 }
 
 export async function GET(request: NextRequest) {
@@ -31,7 +38,7 @@ export async function GET(request: NextRequest) {
   const proximo = searchParams.get("proximo");
   // A porta de onde a pessoa veio (login com Google ou link de confirmação):
   // ver src/lib/lado.ts.
-  const porta: Lado = searchParams.get("lado") === "barbearia" ? "barbearia" : "cliente";
+  const porta = portaDe(searchParams.get("lado"));
   const erro = searchParams.get("error");
   const erroDescricao = searchParams.get("error_description");
 
@@ -53,6 +60,7 @@ export async function GET(request: NextRequest) {
     if (confirmandoEmail) {
       return recusar(
         origin,
+        porta,
         "O link de confirmação expirou ou já tinha sido usado. Tente entrar; se o e-mail ainda não estiver confirmado, refaça o cadastro para receber outro link.",
       );
     }
@@ -64,23 +72,24 @@ export async function GET(request: NextRequest) {
     if (erro === "access_denied") {
       return recusar(
         origin,
+        porta,
         "Você cancelou a entrada com o Google. Pode tentar de novo quando quiser.",
       );
     }
 
     // `server_error` e `temporarily_unavailable` são do lado deles.
     if (erro === "server_error" || erro === "temporarily_unavailable") {
-      return recusar(origin, "O Google não respondeu agora. Tente de novo em instantes.");
+      return recusar(origin, porta, "O Google não respondeu agora. Tente de novo em instantes.");
     }
 
-    return recusar(origin, "Não consegui entrar com o Google. Tente de novo.");
+    return recusar(origin, porta, "Não consegui entrar com o Google. Tente de novo.");
   }
 
   if (!code && !(tokenHash && tipoOtp)) {
     // Sem `code` e sem `error`: ou o link de confirmação de e-mail já foi
     // usado, ou o provedor devolveu o erro no FRAGMENTO da URL (#error=...),
     // que o servidor não enxerga — o navegador não o envia.
-    return recusar(origin, "Link de acesso inválido ou já usado. Peça um novo ou entre de novo.");
+    return recusar(origin, porta, "Link de acesso inválido ou já usado. Peça um novo ou entre de novo.");
   }
 
   const supabase = await createClient();
@@ -100,7 +109,7 @@ export async function GET(request: NextRequest) {
     // Mandar essa pessoa para o login dizendo "link expirado" seria mentira
     // duas vezes — o e-mail está confirmado, e ela só precisa entrar.
     if (confirmandoEmail) {
-      return NextResponse.redirect(`${origin}${ROTA_EMAIL_CONFIRMADO}`);
+      return NextResponse.redirect(`${origin}${ROTA_EMAIL_CONFIRMADO}?lado=${porta}`);
     }
     // Sem sessão, /redefinir-senha mostra "link expirado" e o botão de pedir outro.
     if (redefinindoSenha) return NextResponse.redirect(`${origin}${ROTA_REDEFINIR_SENHA}`);
@@ -110,26 +119,27 @@ export async function GET(request: NextRequest) {
     // não diz o que fazer.
     return recusar(
       origin,
+      porta,
       "Esse link de acesso expirou ou já tinha sido usado. Comece a entrada de novo.",
     );
   }
 
   const { data: perfil, error: erroPerfil } = await supabase
     .from("profiles")
-    .select("role, is_platform_admin")
+    .select("role")
     .eq("id", usuario.id)
     .maybeSingle();
 
   if (erroPerfil) console.error("[callback] falha ao ler o perfil:", erroPerfil);
 
   const temBarbearia = perfil?.role === "owner" || perfil?.role === "assistant";
-  const lado: Lado = porta === "barbearia" && temBarbearia ? "barbearia" : "cliente";
+  const lado: Porta = porta === "barbearia" && temBarbearia ? "barbearia" : "cliente";
 
   // Destino interno vindo do ?proximo= — nunca um domínio de fora.
   const destinoSeguro =
     proximo && proximo.startsWith("/") && !proximo.startsWith("//") ? proximo : null;
   const destino =
-    destinoSeguro ?? (perfil?.is_platform_admin ? "/admin" : casaDoLado(porta, temBarbearia));
+    destinoSeguro ?? casaDoLado(porta, temBarbearia);
 
   const resposta = NextResponse.redirect(`${origin}${destino}`);
   resposta.cookies.set(COOKIE_LADO, lado, OPCOES_COOKIE_LADO);
