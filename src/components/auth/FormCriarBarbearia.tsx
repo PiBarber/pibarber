@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 
 import { criarContaBarbearia, vincularBarbearia } from "@/app/actions/auth";
-import { BotaoGoogle } from "@/components/auth/BotaoGoogle";
 import { CaixaTermos } from "@/components/auth/CaixaTermos";
 import { Button, Field, Input } from "@/components/ui";
 import { erroDeTelefone } from "@/lib/telefone";
@@ -414,16 +413,13 @@ export function FormCriarBarbearia() {
         </Button>
       </form>
 
-      {/* Fora do <form> de cima: o botão do Google é um formulário próprio, e
-          formulário dentro de formulário não existe no HTML. Pela porta da
-          barbearia, uma conta só de cliente cai na tela de abrir a barbearia. */}
+      {/* Sem Google no lado da barbearia: a conta criada pelo Google não tem
+          senha e cria uma pelo "Esqueci minha senha", que fica no cartão. */}
       {vinculo ? (
-        <div className="mt-4">
-          <p className="mb-2 text-center text-xs text-ink-faint">
-            Criou a conta com o Google? Ela não tem senha:
-          </p>
-          <BotaoGoogle rotulo="Continuar com o Google" lado="barbearia" />
-        </div>
+        <p className="mt-4 text-center text-xs text-ink-faint">
+          Criou a conta pelo Google? Ela não tem senha: toque em “Esqueci minha senha” no cartão
+          acima e crie uma com o mesmo e-mail.
+        </p>
       ) : null}
     </>
   );

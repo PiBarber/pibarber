@@ -665,7 +665,9 @@ export async function aceitarTermos(entrada: {
  */
 export async function entrarComGoogle(formData: FormData): Promise<void> {
   const proximo = destinoSeguro(formData.get("proximo"));
-  const lado = portaDe(formData.get("lado"));
+  // Google é só do lado do cliente: o painel abre apenas com e-mail e senha.
+  // O /callback confere de novo — esta é a porta, não a garantia.
+  const lado: Porta = "cliente";
   let destino: string;
 
   try {

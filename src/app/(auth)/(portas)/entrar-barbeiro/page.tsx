@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { BotaoGoogle } from "@/components/auth/BotaoGoogle";
 import { FormEntrar } from "@/components/auth/FormEntrar";
 import { ResumoDoDia } from "@/components/auth/Ilustracoes";
-import { DivisorOu, TelaDividida } from "@/components/auth/TelaDividida";
+import { TelaDividida } from "@/components/auth/TelaDividida";
 import { LinkButton } from "@/components/ui";
 import { ROTA_CADASTRAR_BARBEARIA, ROTA_ENTRAR_CLIENTE } from "@/lib/lado";
 
@@ -46,12 +45,19 @@ export default async function EntrarBarbeiroPage({
         />
       </div>
 
-      <DivisorOu />
-
-      {/* Google aqui também: quem começou como cliente pelo Google e depois
-          abriu uma barbearia não tem senha — sem o botão, ficaria trancado
-          fora do painel. */}
-      <BotaoGoogle proximo={proximo} lado="barbearia" />
+      {/* Sem Google no lado da barbearia (decisão do produto): o painel só
+          abre com e-mail e senha. Quem criou a conta pelo Google não tem
+          senha — cria uma pelo "Esqueci minha senha", com o mesmo e-mail. */}
+      <p className="mt-4 text-center text-xs text-ink-faint">
+        Criou a conta pelo Google? Toque em{" "}
+        <Link
+          href="/esqueci-senha?tipo=barbearia"
+          className="font-medium text-brass hover:text-brass-deep"
+        >
+          Esqueci minha senha
+        </Link>{" "}
+        e crie uma senha com o mesmo e-mail.
+      </p>
 
       <div className="mt-7 border-t border-line pt-6">
         <p className="mb-3 text-center text-sm text-ink-soft">Quer cadastrar sua barbearia?</p>
