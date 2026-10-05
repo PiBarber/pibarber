@@ -17,7 +17,7 @@ test.describe("Admin", () => {
     executar(`update subscriptions set trial_ends_at = now() + interval '2 days'
                where barbershop_id = '${loja.id}'`);
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
 
     await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
     const bloco = page
@@ -29,7 +29,7 @@ test.describe("Admin", () => {
   test("busca a barbearia, abre a ficha e registra uma nota interna", async ({ page }) => {
     const loja = await criarBarbeariaPronta("Ficha Teste");
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
 
     await page.goto("/admin/barbearias");
     await page.getByRole("textbox", { name: "Buscar barbearia" }).fill(loja.nome);
@@ -57,7 +57,7 @@ test.describe("Admin", () => {
       `select trial_ends_at::text as fim from subscriptions where barbershop_id = '${loja.id}'`,
     );
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
 
     await page.goto(`/admin/barbearias/${loja.id}`);
     await page.getByRole("button", { name: "Gerenciar assinatura" }).click();
@@ -86,7 +86,7 @@ test.describe("Admin", () => {
   test("desativa a barbearia: some do público; ativa de novo: volta", async ({ page }) => {
     const loja = await criarBarbeariaPronta("Bloqueio Teste");
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
 
     await page.goto(`/admin/barbearias/${loja.id}`);
     await page.getByRole("button", { name: "Desativar" }).click();
@@ -139,7 +139,7 @@ test.describe("Admin", () => {
 
     await page.context().clearCookies();
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
     await page.goto("/admin/feedbacks");
     const cartao = page.locator("li, article").filter({ hasText: mensagem }).first();
     await expect(cartao).toBeVisible();
@@ -167,7 +167,7 @@ test.describe("Como conheceram o PiBarber", () => {
               values ('${respondeu.id}', 'barber_referral', 'João da Navalha')`);
     const antiga = await criarBarbeariaPronta("Loja Antiga");
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
 
     await expect(page.getByRole("heading", { name: "Como conheceram o PiBarber" })).toBeVisible();
 

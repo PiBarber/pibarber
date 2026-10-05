@@ -165,12 +165,22 @@ export async function criarBarbeariaPronta(nome = "Barbearia E2E"): Promise<Loja
  * Entra pela tela. `porta` é a do login (src/lib/lado.ts): "barbearia" é o
  * "Entrar" da landing; "cliente" é o "Sou cliente".
  */
-export async function entrar(page: Page, email: string, porta: "barbearia" | "cliente") {
-  await page.goto(porta === "barbearia" ? "/entrar-barbeiro" : "/entrar-cliente");
+export async function entrar(
+  page: Page,
+  email: string,
+  porta: "barbearia" | "cliente" | "admin",
+) {
+  const rotas = {
+    barbearia: "/entrar-barbeiro",
+    cliente: "/entrar-cliente",
+    admin: "/admin/entrar",
+  };
+  await page.goto(rotas[porta]);
   await page.locator("#email").fill(email);
   await page.locator("#senha").fill(SENHA);
   await page.getByRole("button", { name: /^Entrar( no painel)?$/ }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/entrar"));
+  // "/entrar-…" das portas públicas e "/admin/entrar" do admin.
+  await page.waitForURL((url) => !url.pathname.includes("/entrar"));
 }
 
 /* ==========================================================================

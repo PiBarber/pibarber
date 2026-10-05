@@ -116,7 +116,7 @@ test.describe("Lembrete de voltar", () => {
     request,
   }) => {
     const admin = await criarAdmin();
-    await entrar(page, admin.email, "barbearia");
+    await entrar(page, admin.email, "admin");
     await page.goto("/admin/emails");
     const campo = page.locator("#volta-dias");
     await campo.fill("40");

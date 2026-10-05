@@ -46,13 +46,15 @@ test("dono se cadastra, passa pelo setup e a barbearia vai ao ar", async ({ page
 
   // "Como conheceu" é obrigatório: sem resposta, não avança.
   await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page.getByRole("alert")).toContainText("Escolha como você conheceu o PiBarber");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Escolha como você conheceu o PiBarber" }),
+  ).toBeVisible();
   await expect(page.locator("#st-nome")).toBeVisible();
 
   // "Outro" exige o "Qual?".
   await page.locator("#st-como-conheceu").selectOption({ label: "Outro" });
   await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page.getByRole("alert")).toContainText("Conte qual foi o canal");
+  await expect(page.getByRole("alert").filter({ hasText: "Conte qual foi o canal" })).toBeVisible();
   await expect(page.locator("#st-nome")).toBeVisible();
 
   await page.locator("#st-como-conheceu-detalhe").fill("  Feira de barbeiros  ");
